@@ -4,14 +4,30 @@ using namespace std;
 
 //TODO try using DATA_PACK in more places (e.g. on more phase_t phases[N_RES_PCLK])
 
-void fetch_tone_increments(groupndx_t group_ndx, toneinc_t tone_inc[N_RES_PCLK], toneinc_t tone_inc_table[N_RES_GROUPS][N_RES_PCLK]){
+void fetch_tones(group_t group_ndx, toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK], phase_t phase0[N_RES_GROUPS][N_RES_PCLK],
+				 tone_t tones[N_RES_PCLK]){
 	tonetable: for (int i=0; i<N_RES_PCLK; i++) {
-		cout<<"Fetched "<<dec<<tone_inc_table[group_ndx][i].to_double()<<" for "<<group_ndx.to_int()<<", "<<i<<endl;
-		tone_inc[i]=tone_inc_table[group_ndx][i];
+		//cout<<"Fetched "<<dec<<tone_inc_table[group_ndx][i].to_double()<<" for "<<group_ndx.to_int()<<", "<<i<<endl;
+		tones[i].inc=toneinc[group_ndx][i];
+		tones[i].phase=phase0[group_ndx][i];
 	}
 }
 
-void increment_phases(groupndx_t group_ndx, toneinc_t tone_inc[N_RES_PCLK], phase_t phases[N_RES_PCLK]) {
+//1024 LUT
+//#include "ap_shift_reg.h"
+//void increment_phases(toneinc_t tones[N_RES_PCLK], phase_t phases[N_RES_PCLK]) {
+//	static ap_shift_reg<phasegroup_t, N_RES_GROUPS> phase_shifter;
+//	phasegroup_t cache=phase_shifter.read(255);
+//	phaseincsr: for (int i=0; i<N_RES_PCLK; i++) {
+//#pragma HLS UNROLL
+//		cache.phases[i]+=tones[i];
+//		phases[i]=cache.phases[i];
+//	}
+//	phase_shifter.shift(cache);
+//}
+
+//4BRAM
+void increment_phases(group_t group_ndx, tone_t tones[N_RES_PCLK], phase_t phases[N_RES_PCLK]) {
 	//Use a cache round robin
 	static phasegroup_t phases_delay_line[N_RES_GROUPS];
 	phasegroup_t cache;
@@ -21,45 +37,10 @@ void increment_phases(groupndx_t group_ndx, toneinc_t tone_inc[N_RES_PCLK], phas
 
 	cache=phases_delay_line[group_ndx];
 	phaseinc: for (int i=0; i<N_RES_PCLK; i++) {
-		cache.phases[i]+=tone_inc[i];
-		phases[i]=cache.phases[i];
+		cache.phases[i]+=tones[i].inc;
+		phases[i]=cache.phases[i]+tones[i].phase;
 	}
 	phases_delay_line[group_ndx]=cache;
-}
-
-void increment_phases2(toneinc_t tone_inc[N_RES_PCLK], phase_t phases[N_RES_PCLK]) {
-	// This is a manual shift delay line with a 2d array, doesn't work for well has it has a huge II
-	static phase_t phases_delay_line[N_RES_GROUPS][N_RES_PCLK]={0};
-
-	#pragma HLS ARRAY_PARTITION variable=phases_delay_line complete dim=2
-    #pragma HLS DATA_PACK variable=phases_delay_line
-	phase_t phases_tmp[N_RES_PCLK];
-
-	fetchshift: for (int i=0; i<N_RES_PCLK; i++) phases_tmp[i]=phases_delay_line[0][i];
-
-	shiftloop: for (int i=0; i<N_RES_GROUPS-1;i++) //shift forward
-		for (int j=0; j<N_RES_PCLK; j++) phases_delay_line[i][j]=phases_delay_line[i+1][j];
-
-	phaseinc: for (int i=0; i<N_RES_PCLK; i++) {
-		phases_tmp[i]+= tone_inc[i];
-		phases[i]=phases_tmp[i];
-	}
-
-	store: for (int i=0; i<N_RES_PCLK; i++) phases_delay_line[N_RES_GROUPS-1][i]=phases_tmp[i];
-}
-
-void increment_phases3(toneinc_t tone_inc[N_RES_PCLK], phase_t phases[N_RES_PCLK]) {
-    //This uses the ap_shift_reg class, works but won't make timing free's up ~8BRAMS
-	static ap_shift_reg<phasegroup_t, N_RES_GROUPS> phases_delay_line;
-    #pragma HLS DATA_PACK variable=phases_delay_line
-
-	phasegroup_t cache;
-	cache=phases_delay_line.read(N_RES_GROUPS-1);
-	phaseinc: for (int i=0; i<N_RES_PCLK; i++) {
-		cache.phases[i]+= tone_inc[i];
-		phases[i]=cache.phases[i];
-	}
-	phases_delay_line.shift(cache);
 }
 
 void init_sincostable(iq_t lut[LUT_LENGTH]) {
@@ -117,7 +98,7 @@ void phase_to_sincos(phase_t phases[N_RES_PCLK], iq_t sincosines[N_RES_PCLK]) {
 void downconvert(iq_t res_iq[N_RES_PCLK], iq_t sincosines[N_RES_PCLK], iq_t iq_out[N_RES_PCLK]) {
 	//ROUND_MODE Values : AP_RND, AP_RND_ZERO, AP_RND_MIN_INF, AP_RND_INF, AP_RND_CONV, AP_TRN, AP_TRN_ZERO
 	//OVERFLOW_MODE Values : AP_SAT, AP_SAT_ZERO, AP_SAT_SYM, AP_WRAP, AP_WRAP_SM
-
+#pragma HLS pipeline ii=1
 	ddsx8: for (int i=0; i<N_RES_PCLK; i++){
 		hls::cmpy<hls::CmpyFourMult,
 				  //W1, I1, Q1, O1, N1
@@ -130,24 +111,26 @@ void downconvert(iq_t res_iq[N_RES_PCLK], iq_t sincosines[N_RES_PCLK], iq_t iq_o
 }
 
 
-void fine_channelizer(resgroup_t &res_in, resgroup_t &res_out,
-					  toneinc_t tone_inc_table[N_RES_GROUPS][N_RES_PCLK])  {
+void resonator_dds(resgroup_t &res_in, resgroup_t &res_out,
+				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
+				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK])  {
 #pragma HLS INTERFACE axis port=res_in
 #pragma HLS INTERFACE axis port=res_out
 #pragma HLS PIPELINE II=1
-#pragma HLS ARRAY_PARTITION variable=tone_inc_table complete dim=2
+#pragma HLS ARRAY_PARTITION variable=toneinc complete dim=2
+#pragma HLS ARRAY_PARTITION variable=phase0 complete dim=2
 #pragma HLS INTERFACE ap_ctrl_none port=return
 
-	toneinc_t tone_inc[N_RES_PCLK];
+	tone_t tones[N_RES_PCLK];
 	phase_t phases[N_RES_PCLK];
 	iq_t sincosines[N_RES_PCLK], iq_out[N_RES_PCLK], iq_in[N_RES_PCLK];
 
 
-	groupndx_t groupid=res_in.user;
+	group_t groupid=res_in.user;
 	incopy: for (int i=0; i<N_RES_PCLK; i++) iq_in[i]=res_in.data.iq[i];
 
-	fetch_tone_increments(groupid, tone_inc, tone_inc_table);
-	increment_phases(groupid,tone_inc, phases);
+	fetch_tones(groupid, toneinc, phase0, tones);
+	increment_phases(groupid, tones, phases);
 	phase_to_sincos(phases, sincosines);
 	downconvert(iq_in, sincosines, iq_out);
 

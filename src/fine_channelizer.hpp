@@ -13,13 +13,13 @@
 #define N_RES_PCLK 8
 #define LUT_LENGTH 16384
 
-typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT> iORq_t;
+typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT> sample_t;
 typedef struct {
-	iORq_t i;
-	iORq_t q;
+	sample_t i;
+	sample_t q;
 } iq_t;
 
-typedef ap_uint<8> groupndx_t;
+typedef ap_uint<8> group_t;
 
 typedef struct {
 	iq_t iq[N_RES_PCLK];
@@ -27,7 +27,7 @@ typedef struct {
 
 typedef struct {
 	iqgroup_t data;
-	groupndx_t user;
+	group_t user;
 } resgroup_t;
 
 
@@ -35,9 +35,14 @@ typedef ap_fixed<16, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
 typedef ap_ufixed<16, 0, AP_RND_CONV, AP_WRAP> phase_t; //0-1 wrap
 
 typedef struct {
+	toneinc_t inc;
+	phase_t phase;
+} tone_t;
+
+typedef struct {
 	phase_t phases[N_RES_PCLK];
 } phasegroup_t;
 
-void fine_channelizer(resgroup_t &res_in, resgroup_t &res_out, toneinc_t tone_inc_table[N_RES_GROUPS][N_RES_PCLK]);
+void resonator_dds(resgroup_t &res_in, resgroup_t &res_out, toneinc_t tone_inc_table[N_RES_GROUPS][N_RES_PCLK]);
 
 #endif
