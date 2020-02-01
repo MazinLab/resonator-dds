@@ -27,7 +27,7 @@ typedef struct {
 
 typedef struct {
 	iqgroup_t data;
-	group_t user;
+	ap_uint<1> last;
 } resgroup_t;
 
 
