@@ -14,6 +14,14 @@
 #define LUT_LENGTH 16384
 
 typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT> sample_t;
+typedef ap_fixed<16, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
+typedef ap_ufixed<16, 0, AP_RND_CONV, AP_WRAP> phase_t; //0-1 wrap
+
+//typedef double sample_t;
+//typedef double toneinc_t;
+//typedef double phase_t;
+
+
 typedef struct {
 	sample_t i;
 	sample_t q;
@@ -31,8 +39,6 @@ typedef struct {
 } resgroup_t;
 
 
-typedef ap_fixed<16, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
-typedef ap_ufixed<16, 0, AP_RND_CONV, AP_WRAP> phase_t; //0-1 wrap
 
 typedef struct {
 	toneinc_t inc;
@@ -43,6 +49,7 @@ typedef struct {
 	phase_t phases[N_RES_PCLK];
 } phasegroup_t;
 
-void resonator_dds(resgroup_t &res_in, resgroup_t &res_out, toneinc_t tone_inc_table[N_RES_GROUPS][N_RES_PCLK]);
-
+void resonator_dds(resgroup_t &res_in, resgroup_t &res_out,
+				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
+				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK]);
 #endif
