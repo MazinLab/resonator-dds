@@ -3,6 +3,8 @@
 using namespace std;
 
 #define N_CYCLES 10
+#define TOL 9e-5
+//Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
 
 int main(){
 
@@ -10,6 +12,8 @@ int main(){
 	toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK];
 	phase_t phase0[N_RES_GROUPS][N_RES_PCLK];
 	complex<double> res_bin_iqs[N_CYCLES][N_RES_GROUPS][N_RES_PCLK];
+	bool fail=false;
+
 
 	FILE *fp;
 	double inc, ival, qval;
@@ -56,29 +60,33 @@ int main(){
 				iq_t downshifted_fp;
 				double phase, diff_i, diff_q; //0-1, increments by the tone increment each cycle
 				//Compute the sin cosine value for the time step
-				phase = (2*M_PI*(i+1))*toneinc[j][k].to_double();
-				dds_val.real(cos(phase));
-				dds_val.imag(sin(phase));
+				phase = i*toneinc[j][k].to_double()+phase0[j][k].to_double();
+				dds_val.real(cos(M_PI*phase));
+				dds_val.imag(sin(M_PI*phase));
 				//Complex multiply with the bin
 				bin_iq=res_bin_iqs[i][j][k];
 				downshifted = dds_val*bin_iq;
 				//Compare
 				downshifted_fp.i=downshifted.real();
 				downshifted_fp.q=downshifted.imag();
+
 				diff_i=out.data.iq[k].i-downshifted_fp.i;
 				diff_q=out.data.iq[k].q-downshifted_fp.q;
-				cout<<"Direct DDS of "<<dds_val<<" with IQ "<<bin_iq<<" yields "<<downshifted<<" which quantizes to ("<<downshifted_fp.i<<","<<downshifted_fp.q<<")";
-				cout<<". Core: ("<<out.data.iq[k].i<<","<<out.data.iq[k].q<<")."<<endl;
-				cout<<"Difference of ("<<diff_i<<","<<diff_q<<")"<<endl;
-				if (abs(diff_i)>7e-5 || abs(diff_q)>7e-5) {
-					cout<<"MISMATCH MISMATCH MISMATCH: "<<i<<" "<<j<<" "<<k<<endl;
+
+				if (abs(diff_i)>TOL || abs(diff_q)>TOL) {
+					cout<<"Mixing DDS "<<phase<<"="<<dds_val<<", inc "<<toneinc[j][k].to_double()<<" with IQ "<<bin_iq<<" -> ";
+					cout<<downshifted<<", ("<<downshifted_fp.i<<","<<downshifted_fp.q<<") quantized.\n";
+					cout<<"Core gives: ("<<out.data.iq[k].i<<","<<out.data.iq[k].q<<")."<<endl;
+					cout<<"Delta of ("<<diff_i<<","<<diff_q<<")"<<endl;
+					cout<<"MISMATCH: cycle="<<i<<" group="<<j<<" res="<<k<<endl;
 					cout<<endl;
-//					return 1;
+					fail|=true;
 				}
 			}
 		}
 	}
-
-	return 0;
+	if (fail) cout <<"FAILED.\n";
+	else cout<<"PASS!\n";
+	return fail;
 
 }

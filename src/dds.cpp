@@ -18,9 +18,13 @@ void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lu
 	lut_word_t  sin_lut_word;
 
 //________________ look up cos/sine table
-full_adr = acc(31,20);
-msb      = full_adr(11,10);
-lsb      = full_adr(9,0);
+//	full_adr = acc(31,20);
+//	fine_adr  = acc(19,11);
+	full_adr = acc(NBITS, NBITS-NLUT-1);  //12 bits
+	fine_adr = acc(NBITS-NLUT-2, NBITS-NLUT-NFINE-1);  //9 bits
+
+	msb      = full_adr(NLUT+1,NLUT); //2 bits
+	lsb      = full_adr(NLUT-1,0); //10 bits, quadrant ndx
 
     // right top
     if (msb==0) { 
@@ -66,12 +70,20 @@ lsb      = full_adr(9,0);
        }
     }
 
+
+//    cout << setw(10) <<acc;
+//    		cout << ", " << full_adr;
+//    cout << ", " <<msb;
+//    cout << ", " <<cos_adr;
+//    cout << ", " <<sin_adr;
+//    cout << ", "  << cos_lut_word;
+//    cout << ", " << sin_lut_word << endl;
     //fp_dout << setw(10) << full_adr;
     //fp_dout << ", " << scientific << cos_lut_word;
     //fp_dout << ", " << scientific << sin_lut_word << endl;
 
     // adjustment w/ fine table
-    fine_adr  = acc(19,11);
+
     fine_word = fine_lut[fine_adr];
 
     dds_t cos_dds, sin_dds;

@@ -10,8 +10,9 @@ using namespace std;
 
 
 // phase accumulator 
-typedef ap_fixed<32,1> incr_t;  // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
-typedef ap_fixed<32,1> acc_t;   // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
+#define NBITS 21
+typedef ap_fixed<NBITS+1,1> incr_t;  // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
+typedef ap_fixed<NBITS+1,1> acc_t;   // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
 
 // cos lut address, word size
 const int NLUT     = 10;               // bitwidth for cos lut address, covers one quadrant
@@ -52,10 +53,6 @@ void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, const do
 void dds ( incr_t  incr,  dds_t*  cos_out,  dds_t* sin_out );
 void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lut[FINESIZE],
 					 dds_t* cos_out, dds_t* sin_out);
-
-typedef struct {
-	acc_t phases[8];
-} accgroup_t;
 
 
 #endif
