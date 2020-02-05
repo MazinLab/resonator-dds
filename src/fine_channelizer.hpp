@@ -44,8 +44,8 @@ typedef struct {
 typedef struct {
 	iqgroup_t data;
 	ap_uint<1> last;
+	group_t user;
 } resgroup_t;
-
 
 
 typedef struct {
@@ -53,6 +53,9 @@ typedef struct {
 	phase_t phase;
 } tone_t;
 
+typedef struct {
+	tone_t tones[N_RES_PCLK];
+} tonegroup_t;
 
 typedef struct {
 	acc_t phases[N_RES_PCLK];
