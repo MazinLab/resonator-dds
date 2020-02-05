@@ -2,13 +2,14 @@
 #include <stdio.h>
 using namespace std;
 
-#define N_CYCLES 10
+#define N_CYCLES 4
 #define TOL 9e-5
 //Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
 
 int main(){
 
-	resgroup_t in[N_RES_GROUPS], out[N_CYCLES][N_RES_GROUPS];
+	resgroup_t in[N_RES_GROUPS];
+	resgroupusr_t out[N_CYCLES][N_RES_GROUPS];
 	toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK];
 	phase_t phase0[N_RES_GROUPS][N_RES_PCLK];
 	complex<double> res_bin_iqs[N_CYCLES][N_RES_GROUPS][N_RES_PCLK];
@@ -51,11 +52,10 @@ int main(){
 				in[j].data.iq[k].q=res_bin_iqs[i][j][k].imag();
 			}
 		}
-//		resgroup_t outtmp[N_RES_GROUPS];
-			//Run the DDS on the data
-		resonator_dds(in, out[i], toneinc, phase0);
-
-		//for (int j=0;j<N_RES_GROUPS;j++) out[i][j]=outtmp[j];
+		//Run the DDS on the data
+		for (int j=0;j<N_RES_GROUPS;j++){
+			resonator_dds(in[j], out[i][j], toneinc, phase0);
+		}
 	}
 
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
