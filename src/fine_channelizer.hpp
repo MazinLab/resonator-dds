@@ -59,7 +59,7 @@ typedef struct {
 } accgroup_t;
 
 
-void resonator_dds(resgroup_t &res_in, resgroup_t &res_out,
+void resonator_dds(resgroup_t res_in[N_RES_GROUPS], resgroup_t res_out[N_RES_GROUPS],
 				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
 				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK]);
 #endif

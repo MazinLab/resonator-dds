@@ -4,20 +4,20 @@
 using namespace std;
 
 void fetch_tones(resgroup_t &input, toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK], phase_t phase0[N_RES_GROUPS][N_RES_PCLK],
-				 tone_t tones[N_RES_PCLK], group_t &group, resgroup_t &resdat){
+				 tone_t tones[N_RES_PCLK], group_t group, resgroup_t &resdat){
 #pragma HLS PIPELINE ii=1
-	static group_t _group;
+//	static group_t _group;
 
 	resdat=input;
-	group=_group;
+//	group=_group;
 
 	fetchtones: for (int i=0; i<N_RES_PCLK; i++) {
 		//cout<<"Fetched "<<dec<<tone_inc_table[group_ndx][i]<<" for "<<group_ndx.to_int()<<", "<<i<<endl;
-		tones[i].inc=toneinc[_group][i];
-		tones[i].phase=phase0[_group][i];
+		tones[i].inc=toneinc[group][i];
+		tones[i].phase=phase0[group][i];
 	}
 
-	_group = resdat.last ? group_t(0) : group_t(_group+1);
+//	_group = resdat.last ? group_t(0) : group_t(_group+1);
 }
 
 void increment_phases(group_t group, tone_t tones[N_RES_PCLK], acc_t phases[N_RES_PCLK]) {
@@ -29,13 +29,13 @@ void increment_phases(group_t group, tone_t tones[N_RES_PCLK], acc_t phases[N_RE
 	#pragma HLS DATA_PACK variable=temp
 //    #pragma HLS DEPENDENCE variable=phase_cache  //dependence is true but with a distance=N_RES_GROUPS, so ignore
 
-//	phase_cache[group-1]=temp;
+	phase_cache[group-1]=temp;
 	temp=phase_cache[group];
 	incphase: for (int i=0; i<N_RES_PCLK; i++) {
 		phases[i]=temp.phases[i]+tones[i].phase;
 		temp.phases[i]+=tones[i].inc;
 	}
-	phase_cache[group]=temp;
+//	phase_cache[group]=temp;
 }
 
 
@@ -102,40 +102,42 @@ void downconvert(resgroup_t resdat, iq_t sincosines[N_RES_PCLK], resgroup_t &out
 }
 
 
-void resonator_dds(resgroup_t &res_in, resgroup_t &res_out,
+void resonator_dds(resgroup_t res_in[N_RES_GROUPS], resgroup_t res_out[N_RES_GROUPS],
 				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
 				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK])  {
 //#pragma HLS RESOURCE variable=toneinc core=RAM_2P_BRAM latency=1
 //#pragma HLS RESOURCE variable=phase0 core=RAM_2P_BRAM latency=1
 #pragma HLS INTERFACE s_axilite port=toneinc bundle=control
 #pragma HLS INTERFACE s_axilite port=phase0 bundle=control
-#pragma HLS PIPELINE II=1
+
 #pragma HLS INTERFACE axis port=res_in
 #pragma HLS INTERFACE axis port=res_out
 #pragma HLS ARRAY_RESHAPE variable=toneinc complete dim=2
 #pragma HLS ARRAY_RESHAPE variable=phase0 complete dim=2
 #pragma HLS INTERFACE s_axilite port=return bundle=control
 
-	tone_t tones[N_RES_PCLK];
-	acc_t phases[N_RES_PCLK];
-	iq_t sincosines[N_RES_PCLK];
-	resgroup_t resdat;
-	group_t group;
+	for (unsigned short group=0; group<256;group++){
+#pragma HLS PIPELINE rewind
+		tone_t tones[N_RES_PCLK];
+		acc_t phases[N_RES_PCLK];
+		iq_t sincosines[N_RES_PCLK];
+		resgroup_t resdat;
 
-	fetch_tones(res_in, toneinc, phase0, tones, group, resdat);
-	increment_phases(group, tones, phases);
-	aphase_to_sincos(phases, sincosines);
-	downconvert(resdat, sincosines, res_out);
-
-#ifndef __SYNTHESIS__
-	if (0){
-	cout<<"Core:\n";
-	cout<<" Tone: "<<tones[0].inc.to_double()<<" "<<tones[0].phase.to_double()<<"\n";
-	cout<<" Phase: "<<phases[0]<<"=("<<sincosines[0].i.to_double()<<","<<sincosines[0].q.to_double()<<")";
-	cout<<" with IQ ("<<resdat.data.iq[0].i.to_double()<<","<<resdat.data.iq[0].q.to_double()<<") -> ";
-	cout<<" ("<<res_out.data.iq[0].i.to_double()<<","<<res_out.data.iq[0].q.to_double()<<")\n";
+		fetch_tones(res_in[group], toneinc, phase0, tones, group, resdat);
+		increment_phases(group, tones, phases);
+		aphase_to_sincos(phases, sincosines);
+		downconvert(resdat, sincosines, res_out[group]);
+		#ifndef __SYNTHESIS__
+			if (0){
+			cout<<"Core:\n";
+			cout<<" Tone: "<<tones[0].inc.to_double()<<" "<<tones[0].phase.to_double()<<"\n";
+			cout<<" Phase: "<<phases[0]<<"=("<<sincosines[0].i.to_double()<<","<<sincosines[0].q.to_double()<<")";
+			cout<<" with IQ ("<<resdat.data.iq[0].i.to_double()<<","<<resdat.data.iq[0].q.to_double()<<") -> ";
+			cout<<" ("<<res_out[group].data.iq[0].i.to_double()<<","<<res_out[group].data.iq[0].q.to_double()<<")\n";
+			}
+		#endif
 	}
-#endif
+
 
 
 }

@@ -8,7 +8,7 @@ using namespace std;
 
 int main(){
 
-	resgroup_t in, out;
+	resgroup_t in[N_RES_GROUPS], out[N_CYCLES][N_RES_GROUPS];
 	toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK];
 	phase_t phase0[N_RES_GROUPS][N_RES_PCLK];
 	complex<double> res_bin_iqs[N_CYCLES][N_RES_GROUPS][N_RES_PCLK];
@@ -45,14 +45,21 @@ int main(){
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
 		for (int j=0;j<N_RES_GROUPS;j++) { //takes N_RES_GROUPS cycles to get through each resonator once
 			//Load the data
-			in.last = j==N_RES_GROUPS-1;
+			in[j].last = j==N_RES_GROUPS-1;
 			for (int k=0;k<N_RES_PCLK;k++) {
-				in.data.iq[k].i=res_bin_iqs[i][j][k].real();
-				in.data.iq[k].q=res_bin_iqs[i][j][k].imag();
+				in[j].data.iq[k].i=res_bin_iqs[i][j][k].real();
+				in[j].data.iq[k].q=res_bin_iqs[i][j][k].imag();
 			}
-
+		}
+//		resgroup_t outtmp[N_RES_GROUPS];
 			//Run the DDS on the data
-			resonator_dds(in, out, toneinc, phase0);
+		resonator_dds(in, out[i], toneinc, phase0);
+
+		//for (int j=0;j<N_RES_GROUPS;j++) out[i][j]=outtmp[j];
+	}
+
+	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
+		for (int j=0;j<N_RES_GROUPS;j++) { //takes N_RES_GROUPS cycles to get through each resonator once
 
 			//Compare the result
 			for (int k=0;k<N_RES_PCLK;k++) {
@@ -70,13 +77,13 @@ int main(){
 				downshifted_fp.i=downshifted.real();
 				downshifted_fp.q=downshifted.imag();
 
-				diff_i=out.data.iq[k].i-downshifted_fp.i;
-				diff_q=out.data.iq[k].q-downshifted_fp.q;
+				diff_i=out[i][j].data.iq[k].i-downshifted_fp.i;
+				diff_q=out[i][j].data.iq[k].q-downshifted_fp.q;
 
 				if (abs(diff_i)>TOL || abs(diff_q)>TOL) {
 					cout<<"Mixing DDS "<<phase<<"="<<dds_val<<", inc "<<toneinc[j][k].to_double()<<" with IQ "<<bin_iq<<" -> ";
 					cout<<downshifted<<", ("<<downshifted_fp.i<<","<<downshifted_fp.q<<") quantized.\n";
-					cout<<"Core gives: ("<<out.data.iq[k].i<<","<<out.data.iq[k].q<<")."<<endl;
+					cout<<"Core gives: ("<<out[i][j].data.iq[k].i<<","<<out[i][j].data.iq[k].q<<")."<<endl;
 					cout<<"Delta of ("<<diff_i<<","<<diff_q<<")"<<endl;
 					cout<<"MISMATCH: cycle="<<i<<" group="<<j<<" res="<<k<<endl;
 					cout<<endl;
