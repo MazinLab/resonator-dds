@@ -54,46 +54,6 @@
       </spirit:parameters>
     </spirit:busInterface>
     <spirit:busInterface>
-      <spirit:name>ap_ctrl</spirit:name>
-      <spirit:busType spirit:vendor="xilinx.com" spirit:library="interface" spirit:name="acc_handshake" spirit:version="1.0"/>
-      <spirit:abstractionType spirit:vendor="xilinx.com" spirit:library="interface" spirit:name="acc_handshake_rtl" spirit:version="1.0"/>
-      <spirit:slave/>
-      <spirit:portMaps>
-        <spirit:portMap>
-          <spirit:logicalPort>
-            <spirit:name>start</spirit:name>
-          </spirit:logicalPort>
-          <spirit:physicalPort>
-            <spirit:name>ap_start</spirit:name>
-          </spirit:physicalPort>
-        </spirit:portMap>
-        <spirit:portMap>
-          <spirit:logicalPort>
-            <spirit:name>done</spirit:name>
-          </spirit:logicalPort>
-          <spirit:physicalPort>
-            <spirit:name>ap_done</spirit:name>
-          </spirit:physicalPort>
-        </spirit:portMap>
-        <spirit:portMap>
-          <spirit:logicalPort>
-            <spirit:name>idle</spirit:name>
-          </spirit:logicalPort>
-          <spirit:physicalPort>
-            <spirit:name>ap_idle</spirit:name>
-          </spirit:physicalPort>
-        </spirit:portMap>
-        <spirit:portMap>
-          <spirit:logicalPort>
-            <spirit:name>ready</spirit:name>
-          </spirit:logicalPort>
-          <spirit:physicalPort>
-            <spirit:name>ap_ready</spirit:name>
-          </spirit:physicalPort>
-        </spirit:portMap>
-      </spirit:portMaps>
-    </spirit:busInterface>
-    <spirit:busInterface>
       <spirit:name>res_in</spirit:name>
       <spirit:busType spirit:vendor="xilinx.com" spirit:library="interface" spirit:name="axis" spirit:version="1.0"/>
       <spirit:abstractionType spirit:vendor="xilinx.com" spirit:library="interface" spirit:name="axis_rtl" spirit:version="1.0"/>
@@ -288,7 +248,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>bd038d48</spirit:value>
+            <spirit:value>065f5f30</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -304,7 +264,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>0685b8f6</spirit:value>
+            <spirit:value>56b3f482</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -320,7 +280,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>902f2d66</spirit:value>
+            <spirit:value>021627f6</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -336,7 +296,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>a8df6dbb</spirit:value>
+            <spirit:value>84967b03</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -449,58 +409,6 @@
         <spirit:name>ap_rst_n</spirit:name>
         <spirit:wire>
           <spirit:direction>in</spirit:direction>
-          <spirit:wireTypeDefs>
-            <spirit:wireTypeDef>
-              <spirit:typeName>std_logic</spirit:typeName>
-              <spirit:viewNameRef>xilinx_verilogsynthesis</spirit:viewNameRef>
-              <spirit:viewNameRef>xilinx_verilogbehavioralsimulation</spirit:viewNameRef>
-            </spirit:wireTypeDef>
-          </spirit:wireTypeDefs>
-        </spirit:wire>
-      </spirit:port>
-      <spirit:port>
-        <spirit:name>ap_start</spirit:name>
-        <spirit:wire>
-          <spirit:direction>in</spirit:direction>
-          <spirit:wireTypeDefs>
-            <spirit:wireTypeDef>
-              <spirit:typeName>std_logic</spirit:typeName>
-              <spirit:viewNameRef>xilinx_verilogsynthesis</spirit:viewNameRef>
-              <spirit:viewNameRef>xilinx_verilogbehavioralsimulation</spirit:viewNameRef>
-            </spirit:wireTypeDef>
-          </spirit:wireTypeDefs>
-        </spirit:wire>
-      </spirit:port>
-      <spirit:port>
-        <spirit:name>ap_done</spirit:name>
-        <spirit:wire>
-          <spirit:direction>out</spirit:direction>
-          <spirit:wireTypeDefs>
-            <spirit:wireTypeDef>
-              <spirit:typeName>std_logic</spirit:typeName>
-              <spirit:viewNameRef>xilinx_verilogsynthesis</spirit:viewNameRef>
-              <spirit:viewNameRef>xilinx_verilogbehavioralsimulation</spirit:viewNameRef>
-            </spirit:wireTypeDef>
-          </spirit:wireTypeDefs>
-        </spirit:wire>
-      </spirit:port>
-      <spirit:port>
-        <spirit:name>ap_idle</spirit:name>
-        <spirit:wire>
-          <spirit:direction>out</spirit:direction>
-          <spirit:wireTypeDefs>
-            <spirit:wireTypeDef>
-              <spirit:typeName>std_logic</spirit:typeName>
-              <spirit:viewNameRef>xilinx_verilogsynthesis</spirit:viewNameRef>
-              <spirit:viewNameRef>xilinx_verilogbehavioralsimulation</spirit:viewNameRef>
-            </spirit:wireTypeDef>
-          </spirit:wireTypeDefs>
-        </spirit:wire>
-      </spirit:port>
-      <spirit:port>
-        <spirit:name>ap_ready</spirit:name>
-        <spirit:wire>
-          <spirit:direction>out</spirit:direction>
           <spirit:wireTypeDefs>
             <spirit:wireTypeDef>
               <spirit:typeName>std_logic</spirit:typeName>
@@ -957,7 +865,7 @@
       <spirit:file>
         <spirit:name>hdl/vhdl/resonator_dds.vhd</spirit:name>
         <spirit:fileType>vhdlSource</spirit:fileType>
-        <spirit:userFileType>CHECKSUM_d91f8178</spirit:userFileType>
+        <spirit:userFileType>CHECKSUM_54880afb</spirit:userFileType>
       </spirit:file>
     </spirit:fileSet>
     <spirit:fileSet>
@@ -1114,14 +1022,14 @@
       </xilinx:taxonomies>
       <xilinx:displayName>Resonator DDS</xilinx:displayName>
       <xilinx:definitionSource>HLS</xilinx:definitionSource>
-      <xilinx:coreRevision>2002051417</xilinx:coreRevision>
-      <xilinx:coreCreationDateTime>2020-02-05T22:17:37Z</xilinx:coreCreationDateTime>
+      <xilinx:coreRevision>2002051719</xilinx:coreRevision>
+      <xilinx:coreCreationDateTime>2020-02-06T01:19:07Z</xilinx:coreCreationDateTime>
     </xilinx:coreExtensions>
     <xilinx:packagingInfo>
       <xilinx:xilinxVersion>2019.2.1</xilinx:xilinxVersion>
-      <xilinx:checksum xilinx:scope="busInterfaces" xilinx:value="53ffcd8f"/>
-      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="6c323f47"/>
-      <xilinx:checksum xilinx:scope="ports" xilinx:value="bfe37fe2"/>
+      <xilinx:checksum xilinx:scope="busInterfaces" xilinx:value="78206756"/>
+      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="4efdee23"/>
+      <xilinx:checksum xilinx:scope="ports" xilinx:value="ddce12c1"/>
       <xilinx:checksum xilinx:scope="parameters" xilinx:value="18cbb4be"/>
     </xilinx:packagingInfo>
   </spirit:vendorExtensions>
