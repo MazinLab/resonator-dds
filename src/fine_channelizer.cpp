@@ -89,12 +89,11 @@ void downconvert(resgroup_t resdat, iqgroup_t sincosines, resgroupusr_t &output,
 void resonator_dds(resgroup_t &res_in, resgroupusr_t &res_out,
 				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
 				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK])  {
-#pragma HLS RESOURCE variable=toneinc core=RAM_1P_BRAM latency=1
-#pragma HLS RESOURCE variable=phase0 core=RAM_1P_BRAM latency=1
+//#pragma HLS RESOURCE variable=toneinc core=RAM_1P_BRAM latency=1
+//#pragma HLS RESOURCE variable=phase0 core=RAM_1P_BRAM latency=1
 #pragma HLS INTERFACE ap_ctrl_none port=return
-//#pragma HLS INTERFACE s_axilite port=toneinc bundle=control
-//#pragma HLS INTERFACE s_axilite port=phase0 bundle=control
-//#pragma HLS INTERFACE s_axilite port=return bundle=control
+#pragma HLS INTERFACE s_axilite port=toneinc bundle=control
+#pragma HLS INTERFACE s_axilite port=phase0 bundle=control
 #pragma HLS DATA_PACK variable=res_out
 #pragma HLS INTERFACE axis port=res_in
 #pragma HLS INTERFACE axis port=res_out
