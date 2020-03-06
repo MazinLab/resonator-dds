@@ -6,11 +6,11 @@ OPTION psf_version = 2.1;
 
 BEGIN driver resonator_dds
 
- OPTION supported_peripherals = (resonator_dds_v0_2 );
+ OPTION supported_peripherals = (resonator_dds_v0_5 );
  OPTION driver_state = ACTIVE;
  OPTION copyfiles = all;
  OPTION name = resonator_dds;
- OPTION version = 0.2;
+ OPTION version = 0.5;
 
 END driver
 

@@ -91,15 +91,16 @@ void resonator_dds(resgroup_t &res_in, resgroupusr_t &res_out,
 				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK])  {
 //#pragma HLS RESOURCE variable=toneinc core=RAM_1P_BRAM latency=1
 //#pragma HLS RESOURCE variable=phase0 core=RAM_1P_BRAM latency=1
+#pragma HLS PIPELINE II=1
 #pragma HLS INTERFACE ap_ctrl_none port=return
-#pragma HLS INTERFACE s_axilite port=toneinc bundle=control
-#pragma HLS INTERFACE s_axilite port=phase0 bundle=control
+#pragma HLS INTERFACE s_axilite port=toneinc bundle=control clock=S_AXI_clk
+#pragma HLS INTERFACE s_axilite port=phase0 bundle=control clock=S_AXI_clk
 #pragma HLS DATA_PACK variable=res_out
-#pragma HLS INTERFACE axis port=res_in
-#pragma HLS INTERFACE axis port=res_out
+#pragma HLS INTERFACE axis port=res_in register reverse
+#pragma HLS INTERFACE axis port=res_out register forward
 #pragma HLS ARRAY_RESHAPE variable=toneinc complete dim=2
 #pragma HLS ARRAY_RESHAPE variable=phase0 complete dim=2
-#pragma HLS PIPELINE  II=1
+
 
 		static group_t group;
 
