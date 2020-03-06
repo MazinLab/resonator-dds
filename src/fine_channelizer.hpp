@@ -67,5 +67,6 @@ typedef struct {
 
 void resonator_dds(resgroup_t &res_in, resgroupusr_t &res_out,
 				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
-				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK]);
+				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK],
+				   bool &reset_phases);
 #endif

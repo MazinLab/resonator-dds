@@ -14,7 +14,9 @@ int main(){
 	phase_t phase0[N_RES_GROUPS][N_RES_PCLK];
 	complex<double> res_bin_iqs[N_CYCLES][N_RES_GROUPS][N_RES_PCLK];
 	bool fail=false;
-
+	bool reset=false;
+	int reset_j=30;
+	int reset_i=1;
 
 	FILE *fp;
 	double inc, ival, qval;
@@ -53,8 +55,10 @@ int main(){
 			}
 		}
 		//Run the DDS on the data
+		bool reset=false;
+		cout<<"Cycle "<<i<<"+++++++++++++++++++++++++++++\n";
 		for (int j=0;j<N_RES_GROUPS;j++){
-			resonator_dds(in[j], out[i][j], toneinc, phase0);
+			resonator_dds(in[j], out[i][j], toneinc, phase0, reset);
 		}
 	}
 
@@ -91,6 +95,84 @@ int main(){
 				}
 			}
 		}
+	}
+
+
+	//Now again but with a reset on group1 cycle 2
+
+	//Run the DDS
+	int reset_cycle=255;
+	int phase_i=N_CYCLES;
+	bool lastreset;
+	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
+		for (int j=0;j<N_RES_GROUPS;j++) { //takes N_RES_GROUPS cycles to get through each resonator once
+			//Load the data
+			in[j].last = j==N_RES_GROUPS-1;
+			for (int k=0;k<N_RES_PCLK;k++) {
+				in[j].data.iq[k].i=res_bin_iqs[i][j][k].real();
+				in[j].data.iq[k].q=res_bin_iqs[i][j][k].imag();
+			}
+		}
+		//Run the DDS on the data
+
+
+		cout<<"Cycle "<<i<<"+++++++++++++++++++++++++++++\n";
+		for (int j=0;j<N_RES_GROUPS;j++){
+
+			phase_i= i>reset_i  ? i-reset_i-1-(j<reset_j) : i+N_CYCLES;
+
+			lastreset=reset;
+			if (j==reset_j&&i==reset_i) {
+				reset=true;
+				reset_cycle=256;
+			}
+			resonator_dds(in[j], out[i][j], toneinc, phase0, reset);
+			//cout<<i<<","<<j<<": Reset "<<reset<<endl;
+			if (reset_cycle==0 && reset!=false) {
+				cout<<"reset not dropped by core\n";
+				fail=true;
+			}
+
+			complex<double> dds_val, bin_iq, downshifted;
+			iq_t downshifted_fp;
+			double phase, diff_i, diff_q; //0-1, increments by the tone increment each cycle
+			//Compute the sin cosine value for the time step
+			for (int k=0;k<N_RES_PCLK;k++) {
+				phase = phase_i*toneinc[j][k].to_double()+phase0[j][k].to_double();
+				phase = lastreset ? 0: phase;
+				dds_val.real(cos(M_PI*phase));
+				dds_val.imag(sin(M_PI*phase));
+				//Complex multiply with the bin
+				bin_iq=res_bin_iqs[i][j][k];
+				downshifted = dds_val*bin_iq;
+				//Compare
+				downshifted_fp.i=downshifted.real();
+				downshifted_fp.q=downshifted.imag();
+
+				diff_i=out[i][j].data.iq[k].i-downshifted_fp.i;
+				diff_q=out[i][j].data.iq[k].q-downshifted_fp.q;
+
+//				if (abs(diff_i)>TOL || abs(diff_q)>TOL) {
+				if (k==1){
+					cout<<"Checking "<<i<<","<<j<<","<<k<<" Reset "<<reset<<endl;
+
+					cout<<" Tone: "<<toneinc[j][k].to_double()<<" "<<phase0[j][k].to_double()<<"\n";
+					cout<<" Phase: "<<phase<<"=("<<dds_val.real()<<","<<dds_val.imag()<<")";
+					cout<<" with IQ ("<<bin_iq.real()<<","<<bin_iq.imag()<<") -> ";
+					cout<<" ("<<downshifted_fp.i.to_double()<<","<<downshifted_fp.q.to_double()<<")\n";
+					cout<<" Delta of ("<<diff_i<<","<<diff_q<<")"<<endl;
+					cout<<" PhaseI: "<<phase_i<<endl;
+				}
+				if (abs(diff_i)>TOL || abs(diff_q)>TOL) {
+					if (k==1){
+						cout<<"MISMATCH: "<<i<<","<<j<<","<<k<<endl;
+					}
+				}
+			}
+
+			reset_cycle-=1;
+		}
+
 	}
 	if (fail) cout <<"FAILED.\n";
 	else cout<<"PASS!\n";
