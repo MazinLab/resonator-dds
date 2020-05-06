@@ -56,7 +56,8 @@ void read_sine_lut( lut_word_t cos_lut[LUTSIZE], const int LUTSIZE );
 #endif
 void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, const double DELTA );
 void dds (incr_t  incr,  ddsiq_t* out);
-void dds (incr_t  incr, incr_t  offset,  ddsiq_t* out);
+void dds256(incr_t    incr, incr_t offset,  unsigned char group, ddsiq_t*  out);
+
 void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lut[FINESIZE],
 					 ddsiq_t* out);
 
