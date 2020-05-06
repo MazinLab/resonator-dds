@@ -3,7 +3,7 @@
 
 //______________________________________________________________________________ 
 void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lut[FINESIZE],
-					 dds_t* cos_out, dds_t* sin_out) {
+					 ddsiq_t* out) {
 #pragma HLS PIPELINE
 	fine_adr_t fine_adr;
 	fine_word_t fine_word;
@@ -86,47 +86,34 @@ void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lu
 
     fine_word = fine_lut[fine_adr];
 
-    dds_t cos_dds, sin_dds;
-    cos_dds = cos_lut_word - sin_lut_word * fine_word;
-    sin_dds = sin_lut_word + cos_lut_word * fine_word;
+    ddsiq_t tmpout;
+    tmpout.i = cos_lut_word - sin_lut_word * fine_word;
+    tmpout.q = sin_lut_word + cos_lut_word * fine_word;
 
     //fp_fine << setw(10) << full_adr;
     //fp_fine << ", " << scientific << cos_dds;
     //fp_fine << ", " << scientific << sin_dds << endl;
 
-    *cos_out = cos_dds;
-    *sin_out = sin_dds;
+    *out=tmpout;
 
 }
 
 
 //______________________________________________________________________________
-void dds ( incr_t    incr,
-           dds_t*    cos_out,
-           dds_t*    sin_out ) {
-
-//#pragma HLS INTERFACE s_axilite port=incr bundle=DDS_BUS
-//#pragma HLS INTERFACE s_axilite port=return bundle=DDS_BUS
-//#pragma HLS INTERFACE axis port=cos_out
-//#pragma HLS INTERFACE axis port=sin_out
-
+void dds (incr_t    incr,  ddsiq_t*  out) {
 #pragma HLS pipeline
 
-//static const lut_word_t cos_lut[LUTSIZE];
-lut_word_t cos_lut[LUTSIZE];
-init_cos_lut( cos_lut, LUTSIZE );
+	//static const lut_word_t cos_lut[LUTSIZE];
+	lut_word_t cos_lut[LUTSIZE];
+	init_cos_lut( cos_lut, LUTSIZE );
 
-// fine table related
-fine_word_t fine_lut[FINESIZE];
-init_fine_lut( fine_lut, FINESIZE, DELTA );
+	// fine table related
+	fine_word_t fine_lut[FINESIZE];
+	init_fine_lut( fine_lut, FINESIZE, DELTA );
 
-
-
-//________________ phase accumulator
-static acc_t acc = 0;
-acc += incr;
-
-phase_to_sincos(acc, cos_lut, fine_lut, cos_out,sin_out);
+	static acc_t acc = 0;
+	phase_to_sincos(acc, cos_lut, fine_lut, out);
+	acc += incr;
 
 }
 

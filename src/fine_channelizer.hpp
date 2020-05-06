@@ -18,17 +18,6 @@ typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT_SYM> sample_t;
 typedef ap_fixed<16, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
 typedef ap_ufixed<16, 1, AP_RND_CONV, AP_WRAP> phase_t; //0-1 wrap
 
-//typedef dds_t sample_t;
-//typedef incr_t toneinc_t;
-//typedef incr_t phase_t; //0-1 wrap
-
-
-
-//typedef double sample_t;
-//typedef double toneinc_t;
-//typedef double phase_t;
-
-
 typedef struct {
 	sample_t i;
 	sample_t q;
@@ -39,6 +28,10 @@ typedef struct {
 typedef struct {
 	iq_t iq[N_RES_PCLK];
 } iqgroup_t;
+
+typedef struct {
+	ddsiq_t iq[N_RES_PCLK];
+} ddsgroup_t;
 
 typedef struct {
 	iqgroup_t data;

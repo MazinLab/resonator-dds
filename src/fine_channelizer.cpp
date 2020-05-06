@@ -40,7 +40,7 @@ void increment_phases(group_t group, tonegroup_t tones, accgroup_t &phasesout, r
 }
 
 
-void aphase_to_sincos(accgroup_t phases, iqgroup_t &sincosines, resgroup_t dummyin, resgroup_t &dummyout) {
+void aphase_to_sincos(accgroup_t phases, ddsgroup_t &ddsv, resgroup_t dummyin, resgroup_t &dummyout) {
 #pragma HLS PIPELINE ii=1
 	//Convert a phase value to a sine,cosine value
 	lut_word_t cos_lut[LUTSIZE];
@@ -51,12 +51,9 @@ void aphase_to_sincos(accgroup_t phases, iqgroup_t &sincosines, resgroup_t dummy
 	init_fine_lut(fine_lut, FINESIZE, DELTA );
 
 	phase2sincos: for (int i=0; i<N_RES_PCLK; i++) {
-		dds_t s, c;
-		iq_t iq;
-		phase_to_sincos(phases.phases[i], cos_lut, fine_lut, &c, &s);
-		iq.i=c;
-		iq.q=s;
-		sincosines.iq[i]=iq;
+		ddsiq_t iq;
+		phase_to_sincos(phases.phases[i], cos_lut, fine_lut, &iq);
+		ddsv.iq[i]=iq;
 	}
 
 	dummyout=dummyin;
@@ -106,7 +103,7 @@ void resonator_dds(resgroup_t &res_in, resgroupusr_t &res_out,
 
 		tonegroup_t tones;
 		accgroup_t phases;
-		iqgroup_t sincosines;
+		ddsgroup_t ddsv;
 		resgroup_t resdat, resdatB, resdatC;
 //#pragma HLS DATA_PACK variable=tones
 //#pragma HLS DATA_PACK variable=phases
@@ -115,8 +112,8 @@ void resonator_dds(resgroup_t &res_in, resgroupusr_t &res_out,
 
 		fetch_tones(res_in, toneinc, phase0, group, tones, resdat);
 		increment_phases(group, tones, phases, resdat, resdatB);
-		aphase_to_sincos(phases, sincosines, resdatB, resdatC);
-		downconvert(resdatC, sincosines, res_out, group);
+		aphase_to_sincos(phases, ddsv, resdatB, resdatC);
+		downconvert(resdatC, ddsv, res_out, group);
 		group++;
 		#ifndef __SYNTHESIS__
 			if (1){
