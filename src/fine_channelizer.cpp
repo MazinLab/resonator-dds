@@ -59,7 +59,7 @@ void aphase_to_sincos(accgroup_t phases, ddsgroup_t &ddsv, resgroup_t dummyin, r
 	dummyout=dummyin;
 }
 
-void downconvert(resgroup_t resdat, iqgroup_t sincosines, resgroupusr_t &output, group_t group) {
+void downconvert(resgroup_t resdat, ddsgroup_t sincosines, resgroupusr_t &output, group_t group) {
 	//ROUND_MODE Values : AP_RND, AP_RND_ZERO, AP_RND_MIN_INF, AP_RND_INF, AP_RND_CONV, AP_TRN, AP_TRN_ZERO
 	//OVERFLOW_MODE Values : AP_SAT, AP_SAT_ZERO, AP_SAT_SYM, AP_WRAP, AP_WRAP_SM
 #pragma HLS PIPELINE ii=1
@@ -120,7 +120,7 @@ void resonator_dds(resgroup_t &res_in, resgroupusr_t &res_out,
 				int i=1;
 			cout<<"Core: "<<group<<"\n";
 			cout<<" Tone: "<<tones.tones[i].inc.to_double()<<" "<<tones.tones[i].phase.to_double()<<"\n";
-			cout<<" Phase: "<<phases.phases[i]<<"=("<<sincosines.iq[i].i.to_double()<<","<<sincosines.iq[i].q.to_double()<<")";
+			cout<<" Phase: "<<phases.phases[i]<<"=("<<ddsv.iq[i].i.to_double()<<","<<ddsv.iq[i].q.to_double()<<")";
 			cout<<" with IQ ("<<resdat.data.iq[i].i.to_double()<<","<<resdat.data.iq[i].q.to_double()<<") -> ";
 			cout<<" ("<<res_out.data.iq[i].i.to_double()<<","<<res_out.data.iq[i].q.to_double()<<")\n";
 			}
