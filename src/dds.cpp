@@ -118,7 +118,22 @@ void dds (incr_t    incr,  ddsiq_t*  out) {
 }
 
 
+void dds (incr_t    incr, incr_t offset,  ddsiq_t*  out) {
+#pragma HLS pipeline
 
+	//static const lut_word_t cos_lut[LUTSIZE];
+	lut_word_t cos_lut[LUTSIZE];
+	init_cos_lut( cos_lut, LUTSIZE );
+
+	// fine table related
+	fine_word_t fine_lut[FINESIZE];
+	init_fine_lut( fine_lut, FINESIZE, DELTA );
+
+	static acc_t acc = 0;
+	phase_to_sincos(acc+offset, cos_lut, fine_lut, out);
+	acc += incr;
+
+}
 
 
 //______________________________________________________________________________ 
