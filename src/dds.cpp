@@ -1,13 +1,15 @@
-
 #include "dds.h"
 
-//______________________________________________________________________________ 
+#ifdef __SYNTHESIS__
+#include <iostream>
+using namespace std;
+#endif
+
 void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lut[FINESIZE],
 					 ddsiq_t* out) {
 #pragma HLS PIPELINE
 	fine_adr_t fine_adr;
 	fine_word_t fine_word;
-
 
 	lut_adr_t  full_adr;         // cover full quadrant
 	quad_adr_t lsb;              // cover 1/4 quadrant
@@ -18,8 +20,6 @@ void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lu
 	lut_word_t  sin_lut_word;
 
 //________________ look up cos/sine table
-//	full_adr = acc(31,20);
-//	fine_adr  = acc(19,11);
 	full_adr = acc(NBITS, NBITS-NLUT-1);  //12 bits
 	fine_adr = acc(NBITS-NLUT-2, NBITS-NLUT-NFINE-1);  //9 bits
 
@@ -71,28 +71,11 @@ void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lu
     }
 
 
-//    cout << setw(10) <<acc;
-//    		cout << ", " << full_adr;
-//    cout << ", " <<msb;
-//    cout << ", " <<cos_adr;
-//    cout << ", " <<sin_adr;
-//    cout << ", "  << cos_lut_word;
-//    cout << ", " << sin_lut_word << endl;
-    //fp_dout << setw(10) << full_adr;
-    //fp_dout << ", " << scientific << cos_lut_word;
-    //fp_dout << ", " << scientific << sin_lut_word << endl;
-
-    // adjustment w/ fine table
-
     fine_word = fine_lut[fine_adr];
 
     ddsiq_t tmpout;
     tmpout.i = cos_lut_word - sin_lut_word * fine_word;
     tmpout.q = sin_lut_word + cos_lut_word * fine_word;
-
-    //fp_fine << setw(10) << full_adr;
-    //fp_fine << ", " << scientific << cos_dds;
-    //fp_fine << ", " << scientific << sin_dds << endl;
 
     *out=tmpout;
 
@@ -114,28 +97,6 @@ void dds (incr_t    incr,  ddsiq_t*  out) {
 	static acc_t acc = 0;
 	phase_to_sincos(acc, cos_lut, fine_lut, out);
 	acc += incr;
-
-}
-
-
-void dds (incr_t    incr, incr_t offset,  unsigned char group, ddsiq_t*  out) {
-#pragma HLS pipeline
-
-	//static const lut_word_t cos_lut[LUTSIZE];
-	lut_word_t cos_lut[LUTSIZE];
-	init_cos_lut( cos_lut, LUTSIZE );
-
-	// fine table related
-	fine_word_t fine_lut[FINESIZE];
-	init_fine_lut( fine_lut, FINESIZE, DELTA );
-
-	static acc_t acc[256], last;
-	acc_t temp;
-	temp=acc[group];
-	//acc[group-1]=last;
-	phase_to_sincos(temp+offset, cos_lut, fine_lut, out);
-	//last += incr;
-	acc[group]=temp+incr;
 
 }
 

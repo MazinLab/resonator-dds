@@ -3,8 +3,8 @@
 #include <math.h>
 using namespace std;
 
-#define N_CYCLES 4
-#define TOL 9e-5
+#define N_CYCLES 2
+#define TOL 5e-7
 //Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
 
 
@@ -89,7 +89,7 @@ int main(){
 				diff_i=out[i][j].data.iq[k].i-downshifted_fp.i;
 				diff_q=out[i][j].data.iq[k].q-downshifted_fp.q;
 
-				maxerror = max(abs(diff_i)+abs(diff_i), maxerror);
+				maxerror = max(max(abs(diff_i),abs(diff_i)), maxerror);
 				if (abs(diff_i)>TOL || abs(diff_q)>TOL) {
 					cout<<"MISMATCH: cycle="<<i<<" group="<<j<<" res="<<k<<endl;
 					cout<<"Mixing DDS "<<phase<<"="<<dds_val<<", inc "<<toneinc[j][k].to_double()<<" with IQ "<<bin_iq<<" -> ";

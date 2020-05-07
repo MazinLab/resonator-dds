@@ -13,6 +13,7 @@
 #define N_RES_GROUPS 256
 #define N_RES_PCLK 8
 
+typedef ap_uint<3> lane_t;
 typedef ap_uint<8> group_t;
 typedef ap_fixed<16, -9, AP_RND_CONV, AP_SAT_SYM> sample_t;
 typedef ap_fixed<16, -7, AP_RND_CONV, AP_SAT_SYM> sampleout_t;
@@ -58,7 +59,7 @@ typedef struct {
 
 typedef struct {
 	toneinc_t inc;
-	phase_t phase;
+	phase_t phase0;
 } tone_t;
 
 typedef struct {
@@ -70,8 +71,14 @@ typedef struct {
 } accgroup_t;
 
 
+//void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
+//				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
+//				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK]);//,
+////				   volatile bool *event_group_misalign);
+
 void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
 				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
 				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK],
-				   volatile bool *event_group_misalign);
+				   bool *event_group_misalign);
+
 #endif
