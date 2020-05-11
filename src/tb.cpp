@@ -24,17 +24,18 @@ int main(){
 	double inc, ival, qval;
 	int group, lane;
 	//Load in tone-bin center offsets and bin IQ values
-	fp=fopen("toneoffsets.dat", "r");
+	fp=fopen("toneinc.dat", "r");
 	if (fp==NULL) cout<<"Null file"<<endl;
 	for (int i=0; i<N_RES_GROUPS*N_RES_PCLK; i++){
 		fscanf(fp, "%lf", &inc);
 		group=i/N_RES_PCLK;
 		lane=i%N_RES_PCLK;
-		toneinc[group][lane] = inc/1.0e6; //TODO the input file has frequencies in HZ
-		phase0[group][lane] = 0.1;
+//		cout<<group<<" "<<lane<<" "<<toneinc_t(inc)<<endl;
+		toneinc[group][lane] = toneinc_t(inc);
+		phase0[group][lane] = phase_t(0.0);
 	}
 	fclose(fp);
-	fp=fopen("resiqs.dat", "r");
+	fp=fopen("resiq.dat", "r");
 	for (int i=0; i<N_RES_GROUPS*N_RES_PCLK; i++){
 		fscanf(fp, "%lf %lf", &qval, &ival); //sin cos in python
 		group=i/N_RES_PCLK;
