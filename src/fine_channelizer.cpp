@@ -3,18 +3,12 @@
 #include <iostream>
 using namespace std;
 
+
 void cmpy(iq_t a, ddsiq_t b, iqout_t &o) {
-#pragma HLS PIPELINE II=1
+#pragma HLS INLINE
       o.i=a.i*b.i-a.q*b.q;
       o.q=a.i*b.q+a.q*b.i;
 }
-
-//void hls_cmpy(iq_t a, ddsiq_t b, iqout_t &o) {
-//#pragma HLS PIPELINE II=1
-//	//arch, W1, I1, Q1, O1, N1
-//    hls::cmpy<hls::CmpyThreeMult,16, 1, AP_RND_CONV, AP_SAT_SYM, 0,
-//              16, 1, AP_RND_CONV, AP_SAT_SYM, 0>(a.i, a.q, sample_t(b.i), sample_t(b.q), o.i, o.q);
-//}
 
 void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
 			 		    toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
