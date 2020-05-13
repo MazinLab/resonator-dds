@@ -59,6 +59,7 @@ void dds (incr_t  incr,  ddsiq_t* out);
 
 void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lut[FINESIZE],
 					 ddsiq_t* out);
+void phase_to_sincos_wLUT(acc_t acc, ddsiq_t* out);
 
 
 #endif
