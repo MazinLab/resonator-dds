@@ -70,15 +70,9 @@ typedef struct {
 	acc_t phases[N_RES_PCLK];
 } accgroup_t;
 
-
-//void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
-//				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
-//				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK]);//,
-////				   volatile bool *event_group_misalign);
-
 void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
 				   toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
 				   phase_t phase0[N_RES_GROUPS][N_RES_PCLK],
-				   bool *event_group_misalign);
+				   bool generate_tlast);//, bool test_tones);
 
 #endif
