@@ -18,7 +18,6 @@ int main(){
 	bool fail=false;
 	bool mismatch=false;
 	double maxerror=0;
-	bool tone_test=false;
 
 
 	//Load in tone-bin center offsets and bin IQ values
@@ -60,13 +59,7 @@ int main(){
 				complex<double> dds_val, bin_iq, ddcd;
 				double phase, diff_i, diff_q; //0-1, increments by the tone increment each cycle
 				//Compute the sin cosine value for the time step
-
-
-				if (tone_test) {
-					phase = i*(j>200)*.025 + (j>128 ? 0.5:1.0);
-				} else {
-					phase = i*toneinc[j][k]+phase0[j][k];
-				}
+				phase = i*toneinc[j][k]+phase0[j][k];
 
 				dds_val.real(cos(M_PI*phase));
 				dds_val.imag(sin(M_PI*phase));
