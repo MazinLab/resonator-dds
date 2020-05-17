@@ -15,6 +15,7 @@ int main(){
 	resgroupout_t out[N_CYCLES][N_RES_GROUPS];
 	toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK];
 	phase_t phase0[N_RES_GROUPS][N_RES_PCLK];
+	tonegroup_t tones[N_RES_GROUPS];
 	bool fail=false;
 	bool mismatch=false;
 	double maxerror=0;
@@ -27,9 +28,16 @@ int main(){
 		lane=i%N_RES_PCLK;
 		toneinc[group][lane] = toneinc_t(0);
 		phase0[group][lane] = phase_t(.25);
+		tones[group].inc[lane]=toneinc[group][lane];
+		tones[group].phase0[lane]=phase0[group][lane];
 	}
 
 	//Run the DDS
+	   resgroup_t lastin[N_RES_GROUPS];
+	   resgroupout_t lastout[N_RES_GROUPS];
+	   accgroup_t lastaccum[N_RES_GROUPS];
+	   ddsgroup_t lastdds[N_RES_GROUPS];
+	   tonegroup_t lasttone[N_RES_GROUPS];
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
 
 		//Run the DDS on the data
@@ -38,12 +46,14 @@ int main(){
 			in.last = j==N_RES_GROUPS-1;
 			in.user=j;
 			for (int k=0;k<N_RES_PCLK;k++) {
-				in.data.iq[k].i.range()=0;
-				in.data.iq[k].q.range()=8192;
+				in.data[2*k].range()=0;
+				in.data[2*k+1].range()=8192;
 			}
 
 			resgroupout_t tmpout;
-			resonator_dds(in, tmpout, toneinc, phase0, true);
+			resonator_dds(in, tmpout, tones,
+					lastin,lastout,lastaccum,lastdds,lasttone,
+					true);
 
 			out[i][j]=tmpout;
 			if (out[i][j].user!=in.user)
@@ -70,8 +80,8 @@ int main(){
 				ddcd = dds_val*bin_iq;
 
 				//Compare
-				diff_i=out[i][j].data.iq[k].i.to_double()-ddcd.real();
-				diff_q=out[i][j].data.iq[k].q.to_double()-ddcd.imag();
+				diff_i=out[i][j].data[2*k].to_double()-ddcd.real();
+				diff_q=out[i][j].data[2*k+1].to_double()-ddcd.imag();
 
 				maxerror = max(max(abs(diff_i),abs(diff_i)), maxerror);
 				if (abs(diff_i)>TOL || abs(diff_q)>TOL) {
@@ -79,8 +89,8 @@ int main(){
 					cout<<"cycle="<<i<<" group="<<j<<" res="<<k<<endl;
 					cout<<"Mixing DDS "<<phase<<"="<<dds_val<<", inc "<<toneinc[j][k].to_double()<<" with IQ "<<bin_iq<<" -> ";
 					cout<<ddcd<<"\n";
-					cout<<"Core gives: ("<<out[i][j].data.iq[k].i.to_double()<<","<<out[i][j].data.iq[k].q.to_double()<<")";
-					cout<<" Int: ("<<out[i][j].data.iq[k].i.V<<","<<out[i][j].data.iq[k].q.V<<")."<<endl;
+					cout<<"Core gives: ("<<out[i][j].data[2*k].to_double()<<","<<out[i][j].data[2*k+1].to_double()<<")";
+					cout<<" Int: ("<<out[i][j].data[2*k].V<<","<<out[i][j].data[2*k+1].V<<")."<<endl;
 					cout<<"Delta of ("<<diff_i<<","<<diff_q<<")"<<endl;
 
 					cout<<endl;

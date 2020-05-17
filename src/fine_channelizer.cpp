@@ -11,9 +11,9 @@ void cmpy(iq_t a, ddsiq_t b, iqout_t &o) {
 }
 
 void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
-				   tonegroup2_t tones[N_RES_GROUPS],
-				   resgroup_t lastpacketin[N_RES_GROUPS],
-				   resgroupout_t lastpacket[N_RES_GROUPS],
+				   tonegroup_t tones[N_RES_GROUPS],
+				   resgroup_t lastin[N_RES_GROUPS],
+				   resgroupout_t lastout[N_RES_GROUPS],
 				   accgroup_t lastaccum[N_RES_GROUPS],
 				   ddsgroup_t lastdds[N_RES_GROUPS],
 				   tonegroup_t lasttone[N_RES_GROUPS],
@@ -22,17 +22,20 @@ void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
 #pragma HLS PIPELINE II=1
 #pragma HLS INTERFACE ap_ctrl_none port=return bundle=control
 #pragma HLS INTERFACE s_axilite port=tones bundle=control clock=s_axi_clk
-#pragma HLS INTERFACE s_axilite port=lastpacket bundle=control clock=s_axi_clk
-#pragma HLS INTERFACE s_axilite port=lastpacketin bundle=control clock=s_axi_clk
+#pragma HLS INTERFACE s_axilite port=lastin bundle=control clock=s_axi_clk
+#pragma HLS INTERFACE s_axilite port=lastout bundle=control clock=s_axi_clk
 #pragma HLS INTERFACE s_axilite port=lastaccum bundle=control clock=s_axi_clk
 #pragma HLS INTERFACE s_axilite port=lastdds bundle=control clock=s_axi_clk
 #pragma HLS INTERFACE s_axilite port=lasttone bundle=control clock=s_axi_clk
 #pragma HLS DATA_PACK variable=tones
-#pragma HLS DATA_PACK variable=lastpacket
-#pragma HLS DATA_PACK variable=lastpacketin
+	//Should be packed as tones.inc[0-7] tones.phase[0-7]
+#pragma HLS DATA_PACK variable=lastin
+#pragma HLS DATA_PACK variable=lastout
 #pragma HLS DATA_PACK variable=lastaccum
 #pragma HLS DATA_PACK variable=lastdds
 #pragma HLS DATA_PACK variable=lasttone
+	//This may be being packed as lasttone.tones[0-7].inc lasttone.tones[0-7].phase hmmm
+
 
 //#pragma HLS INTERFACE s_axilite port=toneinc bundle=control clock=s_axi_clk
 //#pragma HLS INTERFACE s_axilite port=phase0 bundle=control
@@ -48,18 +51,18 @@ void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
 #pragma HLS DATA_PACK variable=accumulator
 	static accgroup_t acc;
 #pragma HLS DATA_PACK variable=acc
-	tonegroup2_t tonestemp;
-	resgroup_t resdat;
-	resgroupout_t outtemp;
+	tonegroup_t tonesgroup;
+	resgroup_t data_in;
+	resgroupout_t data_out;
 
 	//Read in the resonator group and make sure we are aligned
-	resdat=res_in;
-	group = generate_tlast ? group_t(cycle) : group_t(resdat.user);
+	data_in=res_in;
+	group = generate_tlast ? group_t(cycle) : group_t(data_in.user);
 
-	lastpacketin[group]=resdat;
+	lastin[group]=data_in;
 
-	//Fetch the tones
-	tonestemp=tones[group];
+	//Fetch the tones, store last cycles phase, load this cycles phase
+	tonesgroup=tones[group];
 
 	accumulator[group_t(group-1)]=acc;
 	acc=accumulator[group];
@@ -67,43 +70,47 @@ void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
 	//Do the DDC
 //	#ifndef __SYNTHESIS__
 	ddsgroup_t ddsgroup;
-	tonegroup_t tonegroup;
-
-//	#endif
 	accgroup_t accgroup;
+//	#endif
 	ddsx8: for (int i=0; i<N_RES_PCLK; i++) {
 		ddsiq_t ddsv;
 		acc_t accv;
 		tone_t tone;
-		tone.inc = tonestemp.inc[i];
-		tone.phase0 = tonestemp.phase0[i];
+		iq_t iq;
+		iqout_t iqout;
+		tone.inc = tonesgroup.inc[i];
+		tone.phase0 = tonesgroup.phase0[i];
 		accv=acc.phases[i]+tone.phase0;
-		phase_to_sincos_wLUT(accv, &ddsv);
-		cmpy(resdat.data.iq[i], ddsv, outtemp.data.iq[i]);
 		acc.phases[i]+=tone.inc;
-//		#ifndef __SYNTHESIS__
-		tonegroup.tones[i]=tone;
-//		#endif
-		accgroup.phases[i]=accv;
-		ddsgroup.iq[i]=ddsv;
+		phase_to_sincos_wLUT(accv, &ddsv);
 
+		iq.i=data_in.data[2*i];
+		iq.q=data_in.data[2*i+1];
+		cmpy(iq, ddsv, iqout);
+		data_out.data[2*i]=iqout.i;
+		data_out.data[2*i+1]=iqout.q;
+//		#ifndef __SYNTHESIS__
+		accgroup.phases[i]=accv;
+		ddsgroup.i[i]=ddsv.i;
+		ddsgroup.q[i]=ddsv.q;
+		//		#endif
 	}
 	lastaccum[group]=accgroup;
-	lasttone[group]=tonegroup;
+	lasttone[group]=tonesgroup;
 	lastdds[group]=ddsgroup;
-	outtemp.last = group == N_RES_GROUPS-1;
-	outtemp.user = group;
-	lastpacket[group]=outtemp;
-	res_out=outtemp;
+	data_out.last = group == N_RES_GROUPS-1;
+	data_out.user = group;
+	lastout[group]=data_out;
+	res_out=data_out;
 
 	#ifndef __SYNTHESIS__
 	if (group%8==1){
 		int i=0;
-		cout<<"Core: g"<<group<<" gin"<<resdat.user<<" Res "<<group*8+i<<"\n";
-		cout<<" Tone: "<<tonegroup.tones[i].inc<<" "<<tonegroup.tones[i].phase0<<" Accum: "<<accgroup.phases[i]<<"\n";
-		cout<<" DDS: ("<<ddsgroup.iq[i].i<<","<<ddsgroup.iq[i].q<<")";
-		cout<<" with IQ ("<<resdat.data.iq[i].i<<","<<resdat.data.iq[i].q<<") -> ";
-		cout<<" ("<<outtemp.data.iq[i].i<<","<<outtemp.data.iq[i].q<<")\n";
+		cout<<"Core: g"<<group<<" gin"<<data_in.user<<" Res "<<group*8+i<<"\n";
+		cout<<" Tone: "<<tonesgroup.inc[i]<<" "<<tonesgroup.phase0[i]<<" Accum: "<<accgroup.phases[i]<<"\n";
+		cout<<" DDS: ("<<ddsgroup.i[i]<<","<<ddsgroup.q[i]<<")";
+		cout<<" with IQ ("<<data_in.data[2*i]<<","<<data_in.data[2*i+1]<<") -> ";
+		cout<<" ("<<data_out.data[2*i]<<","<<data_out.data[2*i+1]<<")\n";
 	}
 	if (group==255) cout<<"==========\n=============\n========\n";
 	#endif

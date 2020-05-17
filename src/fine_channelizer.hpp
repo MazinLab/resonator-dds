@@ -30,29 +30,29 @@ typedef struct {
 	sampleout_t q;
 } iqout_t;
 
-
-//Note that datapack can't pack structs in structs
-// unless the toplevel struct is the axi stream
 typedef struct {
-	iq_t iq[N_RES_PCLK];
+	sample_t i[N_RES_PCLK];
+	sample_t q[N_RES_PCLK];
 } iqgroup_t;
 
 typedef struct {
-	ddsiq_t iq[N_RES_PCLK];
+	dds_t i[N_RES_PCLK];
+	dds_t q[N_RES_PCLK];
 } ddsgroup_t;
 
 typedef struct {
-	iqout_t iq[N_RES_PCLK];
+	sampleout_t i[N_RES_PCLK];
+	sampleout_t q[N_RES_PCLK];
 } iqgroupout_t;
 
 typedef struct {
-	iqgroup_t data;
+	sample_t data[2*N_RES_PCLK];
 	ap_uint<1> last;
 	group_t user;
 } resgroup_t;
 
 typedef struct {
-	iqgroupout_t data;
+	sampleout_t data[2*N_RES_PCLK];
 	ap_uint<1> last;
 	group_t user;
 } resgroupout_t;
@@ -63,28 +63,18 @@ typedef struct {
 } tone_t;
 
 typedef struct {
-	tone_t tones[N_RES_PCLK];
-} tonegroup_t;
-
-typedef struct {
 	toneinc_t inc[N_RES_PCLK];
 	phase_t phase0[N_RES_PCLK];
-} tonegroup2_t;
+} tonegroup_t;
 
 typedef struct {
 	acc_t phases[N_RES_PCLK];
 } accgroup_t;
-//
-//void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
-//		volatile toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK],
-//		volatile phase_t phase0[N_RES_GROUPS][N_RES_PCLK],
-//	    bool generate_tlast);//, bool test_tones);
-
 
 void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
-		tonegroup2_t tones[N_RES_GROUPS],
-		   resgroup_t lastpacketin[N_RES_GROUPS],
-		   resgroupout_t lastpacket[N_RES_GROUPS],
+		tonegroup_t tones[N_RES_GROUPS],
+		   resgroup_t lastin[N_RES_GROUPS],
+		   resgroupout_t lastout[N_RES_GROUPS],
 		   accgroup_t lastaccum[N_RES_GROUPS],
 		   ddsgroup_t lastdds[N_RES_GROUPS],
 		   tonegroup_t lasttone[N_RES_GROUPS],
