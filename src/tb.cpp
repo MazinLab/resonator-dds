@@ -33,11 +33,6 @@ int main(){
 	}
 
 	//Run the DDS
-	   resgroup_t lastin[N_RES_GROUPS];
-	   resgroupout_t lastout[N_RES_GROUPS];
-	   accgroup_t lastaccum[N_RES_GROUPS];
-	   ddsgroup_t lastdds[N_RES_GROUPS];
-	   tonegroup_t lasttone[N_RES_GROUPS];
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
 
 		//Run the DDS on the data
@@ -51,9 +46,7 @@ int main(){
 			}
 
 			resgroupout_t tmpout;
-			resonator_dds(in, tmpout, tones,
-					lastin,lastout,lastaccum,lastdds,lasttone,
-					true);
+			resonator_dds(in, tmpout, tones, true);
 
 			out[i][j]=tmpout;
 			if (out[i][j].user!=in.user)

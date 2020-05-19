@@ -72,12 +72,5 @@ typedef struct {
 } accgroup_t;
 
 void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
-		tonegroup_t tones[N_RES_GROUPS],
-		   resgroup_t lastin[N_RES_GROUPS],
-		   resgroupout_t lastout[N_RES_GROUPS],
-		   accgroup_t lastaccum[N_RES_GROUPS],
-		   ddsgroup_t lastdds[N_RES_GROUPS],
-		   tonegroup_t lasttone[N_RES_GROUPS],
-	    bool generate_tlast);//, bool test_tones);
-
+		tonegroup_t tones[N_RES_GROUPS], bool generate_tlast);
 #endif
