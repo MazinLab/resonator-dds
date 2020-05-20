@@ -16,8 +16,8 @@ void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
 #pragma HLS INTERFACE ap_ctrl_none port=return bundle=control
 #pragma HLS INTERFACE s_axilite port=tones bundle=control clock=s_axi_clk
 #pragma HLS DATA_PACK variable=tones
-#pragma HLS INTERFACE axis port=res_in register reverse
-#pragma HLS INTERFACE axis port=res_out register forward
+#pragma HLS INTERFACE axis port=res_in register
+#pragma HLS INTERFACE axis port=res_out register
 #pragma HLS INTERFACE ap_stable port=generate_tlast
 
 	static group_t cycle;
