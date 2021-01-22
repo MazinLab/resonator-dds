@@ -6,7 +6,8 @@
 using namespace std;
 
 #include "ap_fixed.h"
-#include <math.h>
+//#include <math.h>
+#include "hls_math.h"
 
 
 // phase accumulator 
@@ -20,6 +21,7 @@ typedef struct {
 	dds_t i;
 	dds_t q;
 } ddsiq_t;
+typedef ap_uint<32> ddsiq32_t;
 
 
 // cos lut address, word size
@@ -40,13 +42,13 @@ typedef ap_fixed<18,-7> fine_word_t;
 
 const double DELTA = M_PI/(2*LUTSIZE*FINESIZE); // fine lut resolution, range covers 0 to pi/(2*LUTSIZE)
 
-ap_uint<19> dither();
-void init_cos_lut( lut_word_t cos_lut[LUTSIZE], const int LUTSIZE );
-void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, const double DELTA );
+//ap_uint<19> dither();
+//void init_cos_lut( lut_word_t cos_lut[LUTSIZE], const int LUTSIZE );
+//void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, const double DELTA );
 
-void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lut[FINESIZE],
-					 ddsiq_t* out);
-void phase_to_sincos_wLUT(acc_t acc, ddsiq_t* out);
+//void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lut[FINESIZE],
+//					 ddsiq_t* out);
+void phase_to_sincos_wLUT(acc_t acc, ddsiq32_t &out);
 
 
 #endif

@@ -12,6 +12,7 @@ void cmpy(iq_t a, ddsiq_t b, iqout_t &o) {
 
 void accumulate(group_t group, tonegroup_t tonesgroup, accgroup_t &accv){
 #pragma HLS PIPELINE II=1
+//#pragma HLS DATA_PACK variable=tonesgroup
 	static accgroup_t accumulator[N_RES_GROUPS], acc;
 	accumulator[group_t(group-1)]=acc;
 	acc=accumulator[group];
@@ -26,11 +27,10 @@ void get_dds(accgroup_t accg, iqgroup_uint_t &ddsg) {
 #pragma HLS PIPELINE II=1
 	p2sc: for (int i=0; i<N_RES_PCLK; i++) {
 		acc_t acc;
-		ddsiq_t ddsv;
+		ddsiq32_t ddsv;
 		acc.range()=accg.range(NBITS*(i+1)-1, NBITS*i);
-		phase_to_sincos_wLUT(acc, &ddsv);
-		ddsg.range(32*(i+1)-1-16, 32*i)=ddsv.i.range();
-		ddsg.range(32*(i+1)-1, 32*i+16)=ddsv.q.range();
+		phase_to_sincos_wLUT(acc, ddsv);
+		ddsg.range(32*(i+1)-1, 32*i)=ddsv.range();
 	}
 }
 
@@ -63,6 +63,7 @@ void resonator_dds(axisdata_t &res_in, axisdata_t &res_out,
 	static group_t cycle;
 	group_t group;
 	tonegroup_t tonesgroup;
+//#pragma HLS DATA_PACK variable=tonesgroup
 	axisdata_t data_in, data_out;
 
 	//-----------
