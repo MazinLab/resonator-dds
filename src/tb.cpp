@@ -11,7 +11,7 @@ using namespace std;
 
 int main(){
 
-	resgroup_t in;
+//	resgroup_t in;
 	resgroupout_t out[N_CYCLES][N_RES_GROUPS];
 	toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK];
 	phase_t phase0[N_RES_GROUPS][N_RES_PCLK];
@@ -38,17 +38,28 @@ int main(){
 		//Run the DDS on the data
 		for (int j=0;j<N_RES_GROUPS;j++){
 
+
+
+//			resgroupout_t tmpout;
+			axisdata_t in, tmpout;
 			in.last = j==N_RES_GROUPS-1;
 			in.user=j;
-			for (int k=0;k<N_RES_PCLK;k++) {
-				in.data[2*k].range()=0;
-				in.data[2*k+1].range()=8192;
+//			for (int k=0;k<N_RES_PCLK;k++) {
+//				in.data[2*k].range()=0;
+//				in.data[2*k+1].range()=8192;
+//			}
+			for (int ii=0;ii<N_RES_PCLK;ii++){
+				in.data.range(32*(i+1)-1-16, 32*i)=0;
+				in.data.range(32*(i+1)-1, 32*i+16)=8192;
 			}
-
-			resgroupout_t tmpout;
 			resonator_dds(in, tmpout, tones, true);
-
-			out[i][j]=tmpout;
+			for (int ii=0;ii<N_RES_PCLK;ii++){
+				out[i][j].data[2*ii].range()=tmpout.data.range(32*(i+1)-1-16, 32*i);
+				out[i][j].data[2*ii+1].range()=tmpout.data.range(32*(i+1)-1, 32*i+16);
+			}
+			out[i][j].last=tmpout.last;
+			out[i][j].user=tmpout.user;
+//			out[i][j]=tmpout;
 			if (out[i][j].user!=in.user)
 				cout<<"Mismatch at "<<i<<","<<j<<": "<<in.user<<"!="<<out[i][j].user<<endl;
 		}

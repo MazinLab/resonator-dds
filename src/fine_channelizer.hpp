@@ -19,11 +19,14 @@ typedef ap_fixed<16, -9, AP_RND_CONV, AP_SAT_SYM> sample_t;
 typedef ap_fixed<16, -7, AP_RND_CONV, AP_SAT_SYM> sampleout_t;
 typedef ap_fixed<16, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
 typedef ap_fixed<16, 1, AP_RND_CONV, AP_WRAP> phase_t; //0-1 wrap
+typedef ap_uint<256> iqgroup_uint_t;
 
 typedef struct {
 	sample_t i;
 	sample_t q;
 } iq_t;
+
+typedef ap_uint<32> iq32_t;
 
 typedef struct {
 	sampleout_t i;
@@ -58,6 +61,13 @@ typedef struct {
 } resgroupout_t;
 
 typedef struct {
+	iqgroup_uint_t data;
+	ap_uint<1> last;
+	group_t user;
+} axisdata_t;
+
+
+typedef struct {
 	toneinc_t inc;
 	phase_t phase0;
 } tone_t;
@@ -67,10 +77,8 @@ typedef struct {
 	phase_t phase0[N_RES_PCLK];
 } tonegroup_t;
 
-typedef struct {
-	acc_t phases[N_RES_PCLK];
-} accgroup_t;
+typedef ap_uint<NBITS*N_RES_PCLK> accgroup_t;
 
-void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
+void resonator_dds(axisdata_t &res_in, axisdata_t &res_out,
 		tonegroup_t tones[N_RES_GROUPS], bool generate_tlast);
 #endif
