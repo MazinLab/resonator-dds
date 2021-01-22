@@ -26,28 +26,24 @@ int main(){
 		int group, lane;
 		group=i/N_RES_PCLK;
 		lane=i%N_RES_PCLK;
-		toneinc[group][lane] = toneinc_t(0);
+		toneinc[group][lane] = toneinc_t(.1);
 		phase0[group][lane] = phase_t(.25);
-		tones[group].inc[lane]=toneinc[group][lane];
-		tones[group].phase0[lane]=phase0[group][lane];
+//		tones[group].inc[lane]=toneinc[group][lane];
+//		tones[group].phase0[lane]=phase0[group][lane];
+		tones[group].range(16*(lane+1)-1, 16*lane)=toneinc[group][lane].range();
+		tones[group].range(16*(lane+1)-1+128, 16*lane+128)=phase0[group][lane].range();
 	}
 
 	//Run the DDS
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
-
+		cout<<"Cycle "<<i<<endl;
 		//Run the DDS on the data
 		for (int j=0;j<N_RES_GROUPS;j++){
 
-
-
-//			resgroupout_t tmpout;
 			axisdata_t in, tmpout;
 			in.last = j==N_RES_GROUPS-1;
 			in.user=j;
-//			for (int k=0;k<N_RES_PCLK;k++) {
-//				in.data[2*k].range()=0;
-//				in.data[2*k+1].range()=8192;
-//			}
+
 			for (int ii=0;ii<N_RES_PCLK;ii++){
 				in.data.range(32*(i+1)-1-16, 32*i)=0;
 				in.data.range(32*(i+1)-1, 32*i+16)=8192;
@@ -59,7 +55,6 @@ int main(){
 			}
 			out[i][j].last=tmpout.last;
 			out[i][j].user=tmpout.user;
-//			out[i][j]=tmpout;
 			if (out[i][j].user!=in.user)
 				cout<<"Mismatch at "<<i<<","<<j<<": "<<in.user<<"!="<<out[i][j].user<<endl;
 		}

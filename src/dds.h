@@ -11,9 +11,10 @@ using namespace std;
 
 
 // phase accumulator 
+#define NBITSP1 22
 #define NBITS 21
-typedef ap_fixed<NBITS+1,1> incr_t;  // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
-typedef ap_fixed<NBITS+1,1> acc_t;   // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
+typedef ap_fixed<NBITSP1,1> incr_t;  // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
+typedef ap_fixed<NBITSP1,1> acc_t;   // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
 
 typedef ap_fixed<16,1,AP_RND_CONV,AP_SAT_SYM> dds_t;
 

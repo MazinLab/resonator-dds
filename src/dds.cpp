@@ -8,69 +8,21 @@ using namespace std;
 
 //______________________________________________________________________________
 static void init_cos_lut( lut_word_t cos_lut[LUTSIZE], const int LUTSIZE ){
-
 	double cos_double;
-
-	// #define FULL
-	//________________________________
-	#ifdef MIDPOINT
-	// store single quadrant
-	  for (int i=0;i<LUTSIZE;i++) {
-		  //cos_double = cos(2*M_PI*(0.0+(double)i)/(4*LUTSIZE));
-		  cos_double = cos(2*M_PI*(0.5+(double)i)/(4*LUTSIZE));
-		  cos_lut[i] = cos_double;
-		  fp_dout << scientific << cos_double <<endl;
-	  }
-
-
-	#ifdef FULL
-	// store full quadrant
-	ofstream fp_ideal ("ideal.txt");
-	  for (int i=0;i<4*LUTSIZE;i++) {
-		  cos_double = cos(2*M_PI*(0.5+(double)i)/(4*LUTSIZE));
-		  fp_ideal << scientific << cos_double <<endl;
-	  }
-	#endif
-
-	//________________________________
-	// not the mid point
-	#else
-	// store single quadrant
-	  for (int i=0;i<LUTSIZE;i++) {
-		  cos_double = cos(2*M_PI*(0.0+(double)i)/(4*LUTSIZE));
-		  cos_lut[i] = cos_double;
-		  //fp_dout << scientific << cos_double <<endl;
-	  }
-
-	#ifdef FULL
-	// store full quadrant
-	ofstream fp_ideal ("ideal.txt");
-	  for (int i=0;i<4*LUTSIZE;i++) {
-		  cos_double = cos(2*M_PI*(0.0+(double)i)/(4*LUTSIZE));
-		  fp_ideal << scientific << cos_double <<endl;
-	  }
-	#endif
-
-
-	#endif
+	for (int i=0;i<LUTSIZE;i++) {
+		cos_double = cos(2*M_PI*(0.0+(double)i)/(4*LUTSIZE));
+		cos_lut[i] = cos_double;
+	}
 }
 
 
 
-
-static void init_fine_lut( fine_word_t fine_lut[FINESIZE],
-                    const int FINESIZE, const double delta ) {
-
-	//double fine_double;
+static void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, const double delta ) {
 	double sine_double;
-	//ofstream fp_dout ("fine.txt");
-
-	  for (int i=0;i<FINESIZE;i++) {
-		  //fine_double = cos(delta*(double)i);
-		  sine_double = sin(delta*(double)i);
-		  fine_lut[i] = sine_double;
-		  //fp_dout << scientific << fine_double <<", " << scientific << sine_double <<endl;
-	  }
+	for (int i=0;i<FINESIZE;i++) {
+		sine_double = sin(delta*(double)i);
+		fine_lut[i] = sine_double;
+	}
 }
 
 
@@ -78,8 +30,8 @@ void phase_to_sincos_wLUT(acc_t acc, ddsiq32_t &out) {
 	#pragma HLS PIPELINE
 
 	//Init LUTs
-	static lut_word_t cos_lut[LUTSIZE];
-	static fine_word_t fine_lut[FINESIZE];
+	lut_word_t cos_lut[LUTSIZE];
+	fine_word_t fine_lut[FINESIZE];
 	init_cos_lut( cos_lut, LUTSIZE );
 	init_fine_lut( fine_lut, FINESIZE, DELTA );
 

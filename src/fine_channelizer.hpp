@@ -72,12 +72,14 @@ typedef struct {
 	phase_t phase0;
 } tone_t;
 
-typedef struct {
-	toneinc_t inc[N_RES_PCLK];
-	phase_t phase0[N_RES_PCLK];
-} tonegroup_t;
+//typedef struct {
+//	toneinc_t inc[N_RES_PCLK];
+//	phase_t phase0[N_RES_PCLK];
+//} tonegroup_t;
 
-typedef ap_uint<NBITS*N_RES_PCLK> accgroup_t;
+typedef ap_uint<256> tonegroup_t;
+
+typedef ap_uint<NBITSP1*N_RES_PCLK> accgroup_t;
 
 void resonator_dds(axisdata_t &res_in, axisdata_t &res_out,
 		tonegroup_t tones[N_RES_GROUPS], bool generate_tlast);
