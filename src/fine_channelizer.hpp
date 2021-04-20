@@ -6,19 +6,21 @@
 #include "ap_fixed.h"
 #include <complex>
 #include "hls_dsp.h"
-#include <math.h>
+#include "hls_math.h"
 #include "ap_shift_reg.h"
 #include "dds.h"
+#include "axi.h"
 
 #define N_RES_GROUPS 256
 #define N_RES_PCLK 8
+#define N_TONEBITS 11
+#define N_P0BITS 21
 
-typedef ap_uint<3> lane_t;
 typedef ap_uint<8> group_t;
-typedef ap_fixed<16, -9, AP_RND_CONV, AP_SAT_SYM> sample_t;
-typedef ap_fixed<16, -7, AP_RND_CONV, AP_SAT_SYM> sampleout_t;
-typedef ap_fixed<16, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
-typedef ap_fixed<16, 1, AP_RND_CONV, AP_WRAP> phase_t; //0-1 wrap
+typedef ap_fixed<16, -9, AP_RND_CONV, AP_SAT_SYM> sample_t;  //-9
+typedef ap_fixed<16, -7, AP_RND_CONV, AP_SAT_SYM> sampleout_t; //-7
+typedef ap_fixed<N_TONEBITS, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
+typedef ap_fixed<N_P0BITS, 1, AP_RND_CONV, AP_WRAP> phase_t; //-1-1 wrap
 typedef ap_uint<256> iqgroup_uint_t;
 
 typedef struct {
@@ -34,53 +36,22 @@ typedef struct {
 } iqout_t;
 
 typedef struct {
-	sample_t i[N_RES_PCLK];
-	sample_t q[N_RES_PCLK];
-} iqgroup_t;
-
-typedef struct {
-	dds_t i[N_RES_PCLK];
-	dds_t q[N_RES_PCLK];
-} ddsgroup_t;
-
-typedef struct {
-	sampleout_t i[N_RES_PCLK];
-	sampleout_t q[N_RES_PCLK];
-} iqgroupout_t;
-
-typedef struct {
-	sample_t data[2*N_RES_PCLK];
-	ap_uint<1> last;
-	group_t user;
-} resgroup_t;
-
-typedef struct {
-	sampleout_t data[2*N_RES_PCLK];
-	ap_uint<1> last;
+	complex<sampleout_t> data[N_RES_PCLK];
+	bool last;
 	group_t user;
 } resgroupout_t;
-
-typedef struct {
-	iqgroup_uint_t data;
-	ap_uint<1> last;
-	group_t user;
-} axisdata_t;
-
 
 typedef struct {
 	toneinc_t inc;
 	phase_t phase0;
 } tone_t;
 
-//typedef struct {
-//	toneinc_t inc[N_RES_PCLK];
-//	phase_t phase0[N_RES_PCLK];
-//} tonegroup_t;
+typedef ap_axiu<256,8,0,0> axisdata_t;
 
-typedef ap_uint<256> tonegroup_t;
+typedef ap_uint<(N_P0BITS+N_TONEBITS)*N_RES_PCLK> tonegroup_t;
 
-typedef ap_uint<NBITSP1*N_RES_PCLK> accgroup_t;
+typedef ap_uint<NBITS*N_RES_PCLK> accgroup_t;
 
-void resonator_dds(axisdata_t &res_in, axisdata_t &res_out,
-		tonegroup_t tones[N_RES_GROUPS], bool generate_tlast);
+void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
+		tonegroup_t tones[N_RES_GROUPS]);
 #endif

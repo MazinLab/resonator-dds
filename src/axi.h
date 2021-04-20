@@ -20,9 +20,6 @@ template<int D, int U>
  };
 
 
-typedef ap_axiu<512,0,0,0> opfb_stream_t;
-
-typedef ap_axiu<256,8,0,0> resstream_t;
 
 
 #ifdef AESL_SYN

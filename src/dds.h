@@ -6,15 +6,15 @@
 using namespace std;
 
 #include "ap_fixed.h"
-//#include <math.h>
 #include "hls_math.h"
 
 
 // phase accumulator 
-#define NBITSP1 22
-#define NBITS 21
-typedef ap_fixed<NBITSP1,1> incr_t;  // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
-typedef ap_fixed<NBITSP1,1> acc_t;   // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
+#define NBITS 21  //must be no less than NLUT+NFINE+2
+
+
+//typedef ap_fixed<NBITS,1> incr_t;  // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
+typedef ap_fixed<NBITS,1> acc_t;   // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
 
 typedef ap_fixed<16,1,AP_RND_CONV,AP_SAT_SYM> dds_t;
 
@@ -25,6 +25,8 @@ typedef struct {
 typedef ap_uint<32> ddsiq32_t;
 
 
+//NB cos table bits is LUTSIZE*17 so up to 1024 will be only one bram and the fine table is similar
+// so we dont save by going smaller
 // cos lut address, word size
 const int NLUT     = 10;               // bitwidth for cos lut address, covers one quadrant
 const int LUTSIZE  = 1024;             // 2^NLUT
@@ -35,7 +37,7 @@ const int FINESIZE  = 512;             // 2^NFINE
 
 typedef ap_uint<NLUT+2> lut_adr_t;     // covers 4 quadrant
 typedef ap_uint<NLUT>   quad_adr_t;    // covers 1 quadrant
-typedef ap_uint<NLUT+2> fine_adr_t;    // covers 4 quadrant
+typedef ap_uint<NFINE> fine_adr_t;    // covers 4 quadrant
 
 // rounding makes huge difference in the noise floor
 typedef ap_fixed<18,1,AP_RND_CONV,AP_SAT_SYM> lut_word_t;
@@ -43,12 +45,6 @@ typedef ap_fixed<18,-7> fine_word_t;
 
 const double DELTA = M_PI/(2*LUTSIZE*FINESIZE); // fine lut resolution, range covers 0 to pi/(2*LUTSIZE)
 
-//ap_uint<19> dither();
-//void init_cos_lut( lut_word_t cos_lut[LUTSIZE], const int LUTSIZE );
-//void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, const double DELTA );
-
-//void phase_to_sincos(acc_t acc, lut_word_t cos_lut[LUTSIZE], fine_word_t fine_lut[FINESIZE],
-//					 ddsiq_t* out);
 void phase_to_sincos_wLUT(acc_t acc, ddsiq32_t &out);
 
 

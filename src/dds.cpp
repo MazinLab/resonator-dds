@@ -48,10 +48,10 @@ void phase_to_sincos_wLUT(acc_t acc, ddsiq32_t &out) {
 	lut_word_t  sin_lut_word;
 
 //________________ look up cos/sine table
-	full_adr = acc(NBITS, NBITS-NLUT-1);  //12 bits
-	fine_adr = acc(NBITS-NLUT-2, NBITS-NLUT-NFINE-1);  //9 bits
+	full_adr = acc(NBITS-1, NBITS-NLUT-2);  //12 bits  21,10
+	fine_adr = acc(NBITS-NLUT-3, NBITS-NLUT-NFINE-2);  //9 bits  9, 0
 
-	msb      = full_adr(NLUT+1,NLUT); //2 bits
+	msb      = full_adr(NLUT+1, NLUT); //2 bits
 	lsb      = full_adr(NLUT-1,0); //10 bits, quadrant ndx
 
     // right top
