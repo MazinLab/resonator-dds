@@ -4,84 +4,97 @@
 using namespace std;
 
 
-void cmpy(iq_t a, ddsiq_t b, iqout_t &o) {
+void cmpy(const iq_t a, const ddsiq_t b, iqout_t &o) {
 #pragma HLS INLINE
       o.i=a.i*b.i-a.q*b.q;
       o.q=a.i*b.q+a.q*b.i;
 }
 
-void resonator_dds(resgroup_t &res_in, resgroupout_t &res_out,
-				   tonegroup_t tones[N_RES_GROUPS], bool generate_tlast) {
+void accumulate(const group_t group, const tonegroup_t tonesgroup, accgroup_t &accv){
 #pragma HLS PIPELINE II=1
-#pragma HLS INTERFACE ap_ctrl_none port=return bundle=control
-#pragma HLS INTERFACE s_axilite port=tones bundle=control clock=s_axi_clk
-#pragma HLS DATA_PACK variable=tones
-#pragma HLS INTERFACE axis port=res_in register
-#pragma HLS INTERFACE axis port=res_out register
-#pragma HLS INTERFACE ap_stable port=generate_tlast
-
-	static group_t cycle;
-	group_t group;
-	static accgroup_t accumulator[N_RES_GROUPS];
-#pragma HLS DATA_PACK variable=accumulator
-	static accgroup_t acc;
-#pragma HLS DATA_PACK variable=acc
-	tonegroup_t tonesgroup;
-	resgroup_t data_in;
-	resgroupout_t data_out;
-
-	//Read in the resonator group and make sure we are aligned
-	data_in=res_in;
-	group = generate_tlast ? group_t(cycle) : group_t(data_in.user);
-
-	//Fetch the tones, store last cycles phase, load this cycles phase
-	tonesgroup=tones[group];
-
+	static accgroup_t accumulator[N_RES_GROUPS], acc;
 	accumulator[group_t(group-1)]=acc;
 	acc=accumulator[group];
-
-	//Do the DDC
-	#ifndef __SYNTHESIS__
-	ddsgroup_t ddsgroup;
-	accgroup_t accgroup;
-	#endif
-	ddsx8: for (int i=0; i<N_RES_PCLK; i++) {
-		ddsiq_t ddsv;
-		acc_t accv;
-		tone_t tone;
-		iq_t iq;
-		iqout_t iqout;
-		tone.inc = tonesgroup.inc[i];
-		tone.phase0 = tonesgroup.phase0[i];
-		accv=acc.phases[i]+tone.phase0;
-		acc.phases[i]+=tone.inc;
-		phase_to_sincos_wLUT(accv, &ddsv);
-		iq.i=data_in.data[2*i];
-		iq.q=data_in.data[2*i+1];
-		cmpy(iq, ddsv, iqout);
-		data_out.data[2*i]=iqout.i;
-		data_out.data[2*i+1]=iqout.q;
-		#ifndef __SYNTHESIS__
-		accgroup.phases[i]=accv;
-		ddsgroup.i[i]=ddsv.i;
-		ddsgroup.q[i]=ddsv.q;
-		#endif
+	incp: for (int i=0; i<N_RES_PCLK; i++) {
+		phase_t phase0;
+		toneinc_t inc;
+		acc_t tmp;
+		inc.range()=tonesgroup.range(N_TONEBITS*(i+1)-1, N_TONEBITS*i);
+		phase0.range()=tonesgroup.range(N_P0BITS*(i+1)-1+N_TONEBITS*N_RES_PCLK,N_P0BITS*i+N_TONEBITS*N_RES_PCLK);
+		tmp.range()=acc.range(NBITS*(i+1)-1, NBITS*i);
+		accv.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+phase0).range();
+		acc.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+inc).range();
 	}
+}
+
+void get_dds(const accgroup_t accg, iqgroup_uint_t &ddsg) {
+#pragma HLS PIPELINE II=1
+	p2sc: for (int i=0; i<N_RES_PCLK; i++) {
+		acc_t acc;
+		ddsiq32_t ddsv;
+		acc.range()=accg.range(NBITS*(i+1)-1, NBITS*i);
+		phase_to_sincos_wLUT(acc, ddsv);
+		ddsg.range(32*(i+1)-1, 32*i)=ddsv.range();
+	}
+}
+
+void ddc(const iqgroup_uint_t in, const iqgroup_uint_t ddsgroup, iqgroup_uint_t &out){
+#pragma HLS PIPELINE II=1
+	ddc: for (int i=0; i<N_RES_PCLK; i++) {
+		iqout_t iqout;
+		iq_t iq;
+		ddsiq_t ddsv;
+		iq.i.range()=in.range(32*(i+1)-1-16, 32*i);
+		iq.q.range()=in.range(32*(i+1)-1, 32*i+16);
+		ddsv.i.range()=ddsgroup.range(32*(i+1)-1-16, 32*i);
+		ddsv.q.range()=ddsgroup.range(32*(i+1)-1, 32*i+16);
+		cmpy(iq, ddsv, iqout);
+		out.range(32*(i+1)-1-16, 32*i)=iqout.i.range();
+		out.range(32*(i+1)-1, 32*i+16)=iqout.q.range();
+	}
+}
+
+void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
+				  tonegroup_t tones[N_RES_GROUPS]) {
+
+#pragma HLS INTERFACE ap_ctrl_none port=return
+#pragma HLS INTERFACE s_axilite port=tones clock=axi_clk
+#pragma HLS INTERFACE axis port=res_in register
+#pragma HLS INTERFACE axis port=res_out register
+
+//	while (!res_in.empty()) {
+#pragma HLS PIPELINE II=1
+	static group_t cycle;
+	group_t group;
+	axisdata_t data_in, data_out;
+
+	//-----------
+	//Tone and accumulator fetching
+	//-----------
+	res_in.read(data_in);
+	group = cycle;
+	//--------
+	//Compute phase value
+	//--------
+	accgroup_t accg;
+	accumulate(group, tones[group], accg);
+	//--------
+	//Convert phase to sincos
+	//--------
+	iqgroup_uint_t ddsg;
+	get_dds(accg, ddsg);
+	//--------
+	//Perform the DDC
+	//--------
+	iqgroup_uint_t out;
+	ddc(data_in.data, ddsg, out);
+	//--------
+	//Output
+	//--------
+	data_out.data = out;
 	data_out.last = group == N_RES_GROUPS-1;
 	data_out.user = group;
-	res_out=data_out;
-
-	#ifndef __SYNTHESIS__
-	if (group%8==1){
-		int i=0;
-		cout<<"Core: g"<<group<<" gin"<<data_in.user<<" Res "<<group*8+i<<"\n";
-		cout<<" Tone: "<<tonesgroup.inc[i]<<" "<<tonesgroup.phase0[i]<<" Accum: "<<accgroup.phases[i]<<"\n";
-		cout<<" DDS: ("<<ddsgroup.i[i]<<","<<ddsgroup.q[i]<<")";
-		cout<<" with IQ ("<<data_in.data[2*i]<<","<<data_in.data[2*i+1]<<") -> ";
-		cout<<" ("<<data_out.data[2*i]<<","<<data_out.data[2*i+1]<<")\n";
-	}
-	if (group==255) cout<<"==========\n=============\n========\n";
-	#endif
+	res_out.write(data_out);
 
 	cycle++;
-}
+	}
