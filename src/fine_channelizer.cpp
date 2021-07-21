@@ -58,7 +58,7 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 				  tonegroup_t tones[N_RES_GROUPS]) {
 
 #pragma HLS INTERFACE ap_ctrl_none port=return
-#pragma HLS INTERFACE s_axilite port=tones clock=axi_clk
+#pragma HLS INTERFACE s_axilite port=tones
 #pragma HLS INTERFACE axis port=res_in register
 #pragma HLS INTERFACE axis port=res_out register
 
