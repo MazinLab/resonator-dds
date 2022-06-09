@@ -17,6 +17,10 @@ using namespace std;
 typedef ap_fixed<NBITS,1> acc_t;   // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
 
 typedef ap_fixed<16,1,AP_RND_CONV,AP_SAT_SYM> dds_t;
+typedef ap_fixed<18,1,AP_RND_CONV,AP_SAT_SYM> dds18_t;
+
+typedef complex<dds18_t> dds18_complex_t;
+typedef complex<dds_t> dds_complex_t;
 
 typedef struct {
 	dds_t i;
@@ -46,6 +50,7 @@ typedef ap_fixed<18,-7> fine_word_t;
 const double DELTA = M_PI/(2*LUTSIZE*FINESIZE); // fine lut resolution, range covers 0 to pi/(2*LUTSIZE)
 
 void phase_to_sincos_wLUT(acc_t acc, ddsiq32_t &out);
+void phase_to_sincos_wLUT(acc_t acc, dds18_complex_t &out);
 
 
 #endif

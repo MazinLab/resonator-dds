@@ -17,11 +17,14 @@
 #define N_P0BITS 21
 
 typedef ap_uint<8> group_t;
-typedef ap_fixed<16, -9, AP_RND_CONV, AP_SAT_SYM> sample_t;  //-9
-typedef ap_fixed<16, -7, AP_RND_CONV, AP_SAT_SYM> sampleout_t; //-7
+typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT_SYM> sample_t;  //-9
+typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT_SYM> sampleout_t; //-7
 typedef ap_fixed<N_TONEBITS, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
 typedef ap_fixed<N_P0BITS, 1, AP_RND_CONV, AP_WRAP> phase_t; //-1-1 wrap
 typedef ap_uint<256> iqgroup_uint_t;
+
+typedef complex<sample_t> sample_complex_t;
+typedef complex<sampleout_t> sampleout_complex_t;
 
 typedef struct {
 	sample_t i;
