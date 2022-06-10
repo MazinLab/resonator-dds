@@ -6,69 +6,25 @@
 using namespace std;
 
 
-void cmpydds(sample_complex_t iq, dds_words_t dds, sampleout_complex_t& p_product, int res) {
+void cmpydds(sample_complex_t iq, dds_words_t dds, sampleout_complex_t& p_product) {
 	sample_t a,b;
 	dds18_t c,d;
 	lut_word_t cos_word;
 	lut_word_t sin_word;
 	fine_word_t fine_word;
+	dds18_t ac, ad, bd, bc;
+	sampleout_t r,i;
+//#pragma HLS PIPELINE II=1
+//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+#pragma HLS INLINE
 
-	//#pragma HLS BIND_OP variable=c op=mul impl=dsp
-//#pragma HLS BIND_OP variable=c op=add impl=dsp
-//#pragma HLS BIND_OP variable=c op=sub impl=dsp
-//
-//#pragma HLS BIND_OP variable=d op=add impl=dsp
-//#pragma HLS BIND_OP variable=d op=sub impl=dsp
-//#pragma HLS BIND_OP variable=d op=mul impl=dsp
-
-//#pragma HLS BIND_OP variable=sin_word op=mul impl=dsp
-//#pragma HLS BIND_OP variable=sin_word op=add impl=dsp
-//#pragma HLS BIND_OP variable=sin_word op=sub impl=dsp
-//#pragma HLS BIND_OP variable=cos_word op=mul impl=dsp
-//#pragma HLS BIND_OP variable=cos_word op=add impl=dsp
-//#pragma HLS BIND_OP variable=cos_word op=sub impl=dsp
-//#pragma HLS BIND_OP variable=fine_word op=mul impl=dsp
-//#pragma HLS BIND_OP variable=fine_word op=add impl=dsp
-//#pragma HLS BIND_OP variable=fine_word op=sub impl=dsp
-#pragma HLS PIPELINE II=1
-#pragma HLS INTERFACE mode=ap_ctrl_none port=return
-//#pragma HLS INLINE
 
 	a=iq.real();
 	b=iq.imag();
-
-//	c=dds.cos_word - dds.sin_word * dds.fine_word;
-//	d=dds.sin_word + dds.cos_word * dds.fine_word;
-
-	cos_word=dds.cos_word;
-	sin_word=dds.sin_word;
-	fine_word=dds.fine_word;
-	c=cos_word - sin_word * fine_word;
-	d=sin_word + cos_word * fine_word;
-	dds18_t ac, ad, bd, bc;
-	sampleout_t r,i;
-//#pragma HLS BIND_OP variable=ab op=add impl=dsp
-//#pragma HLS BIND_OP variable=ac op=add impl=dsp
-//#pragma HLS BIND_OP variable=bd op=add impl=dsp
-//#pragma HLS BIND_OP variable=i op=add impl=dsp
-	ac=a*c;
-	bd=b*d;
-	ad=a*d;
-	bc=b*c;
-	r=ac-bd;
-	i=ad+bc;
-
-	p_product.real(r);
-	p_product.imag(i);
-
-//	p_product.real(dds18_t(a*c)-dds18_t(b*d));
-//	p_product.imag(dds18_t(a*d)+dds18_t(b*c));
-
-//	p_product.real(a*(dds.cos_word - dds.sin_word * dds.fine_word)-b*(dds.sin_word + dds.cos_word * dds.fine_word));
-//	p_product.imag(a*(dds.sin_word + dds.cos_word * dds.fine_word)+b*(dds.cos_word - dds.sin_word * dds.fine_word));
-
-//	p_product.real(a*(cos_word - sin_word * fine_word)-b*(sin_word + cos_word * fine_word));
-//	p_product.imag(a*(sin_word + cos_word * fine_word)+b*(cos_word - sin_word * fine_word));
+	c=dds.cos_word - dds.sin_word * dds.fine_word;
+	d=dds.sin_word + dds.cos_word * dds.fine_word;
+	p_product.real(a*c-b*d);
+	p_product.imag(a*d+b*c);
 
 
 //	if (res==1) {
@@ -138,7 +94,7 @@ void ddsddc(const accgroup_t accg, const iqgroup_uint_t in, iqgroup_uint_t &out)
 
 //		iq[i].real().range()=0x7fff;
 //		iq[i].imag().range()=0;
-		cmpydds(iq, ddsv, iqout, i);
+		cmpydds(iq, ddsv, iqout);
 		out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
 		out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
 
@@ -155,7 +111,7 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 #pragma HLS INTERFACE axis port=res_out register
 
 
-	while (!res_in.empty()) {  //For csim
+//	while (!res_in.empty()) {  //For csim
 #pragma HLS PIPELINE II=1
 
 	static group_t cycle;
@@ -168,13 +124,13 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 	res_in.read(data_in);
 	group = cycle;
 
-
 	//--------
 	//Compute phase value
 	//--------
 	accgroup_t accg;
 	accumulate(group, tones[group], accg);
 
+	//For csim (optional, reduce TDM penalty)
 //	if (group!=33) {
 //		res_out.write(data_out);
 //		cycle++;
@@ -198,16 +154,6 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 	//Increment cycle
 	cycle++;
 
-	//#ifndef __SYNTHESIS__
-	//	double a,b,c,d;
-	//	a=data_in.data.range(15, 0).to_int();
-	//	b=data_in.data.range(31, 16).to_int();
-	//	c=data_out.data.range(15, 0).to_int();
-	//	d=data_out.data.range(31, 16).to_int();
-	//
-	//	cout<<"In mag:"<<sqrt(a*a+b*b)<<" Out mag:"<<sqrt(c*c+d*d)<<endl;
-	//#endif
-
-	}
+//	} //For csim
 
 }
