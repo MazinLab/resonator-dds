@@ -60,9 +60,14 @@ void cmpy(sample_complex_t iq, dds_complex_t dds, sampleout_complex_t& p_product
 
 }
 
-void accumulate(const group_t group, const tonegroup_t tonesgroup, accgroup_t &accv){
+void accumulate(const group_t group, tonegroup_t tones[N_RES_GROUPS], accgroup_t &accv, group_t &cycle_out){
 #pragma HLS PIPELINE II=1
 #pragma HLS INTERFACE mode=ap_ctrl_none port=return
+	static group_t cycle;
+	tonegroup_t tonesgroup;
+	cycle_out=cycle;
+	tonesgroup=tones[cycle++];
+
 	static accgroup_t accumulator[N_RES_GROUPS], acc;
 	accumulator[group_t(group-1)]=acc;
 	acc=accumulator[group];
@@ -79,24 +84,30 @@ void accumulate(const group_t group, const tonegroup_t tonesgroup, accgroup_t &a
 }
 
 
-void ddsddc(const accgroup_t accg, const iqgroup_uint_t in, iqgroup_uint_t &out){
+void ddsddc(const accgroup_t accg, loopcenter_group_t centergroups[], group_t group, const iqgroup_uint_t in, iqgroup_uint_t &out){
 #pragma HLS PIPELINE II=1
 #pragma HLS INTERFACE mode=ap_ctrl_none port=return
 
+	loopcenter_group_t centergroup;
+	centergroup=centergroups[group];
 	ddc: for (int i=0; i<N_RES_PCLK; i++) {
 		dds_words_t ddsv;
 		dds_complex_t dds_sincos;
 		sampleout_complex_t iqout;
 		acc_t acc;
 		sample_complex_t iq;
+		loopcenter_t center;
 
 		acc.range()=accg.range(NBITS*(i+1)-1, NBITS*i);
 		iq.real().range()=in.range(32*(i+1)-16-1, 32*i);
 		iq.imag().range()=in.range(32*(i+1)-1, 32*i+16);
+		center.real().range()=centergroup.range(32*(i+1)-16-1, 32*i);
+		center.imag().range()=centergroup.range(32*(i+1)-1, 32*i+16);
 
 		phase_sincos_LUT(acc, ddsv);
 		dds(ddsv, dds_sincos);
 		cmpy(iq, dds_sincos, iqout);
+		iqout-=center;
 
 		out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
 		out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
@@ -106,9 +117,10 @@ void ddsddc(const accgroup_t accg, const iqgroup_uint_t in, iqgroup_uint_t &out)
 
 
 void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
-				   tonegroup_t tones[N_RES_GROUPS]) {
+				   tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS]) {
 #pragma HLS INTERFACE ap_ctrl_none port=return
 #pragma HLS INTERFACE s_axilite port=tones
+#pragma HLS INTERFACE s_axilite port=centers
 #pragma HLS INTERFACE axis port=res_in register
 #pragma HLS INTERFACE axis port=res_out register
 
@@ -116,7 +128,7 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 //	while (!res_in.empty()) {  //For csim
 #pragma HLS PIPELINE II=1
 
-	static group_t cycle;
+//	static group_t cycle;
 	group_t group;
 	axisdata_t data_in, data_out;
 
@@ -124,13 +136,12 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 	//Tone and accumulator fetching
 	//-----------
 	res_in.read(data_in);
-	group = cycle;
 
 	//--------
 	//Compute phase value
 	//--------
 	accgroup_t accg;
-	accumulate(group, tones[group], accg);
+	accumulate(group, tones, accg, group);
 
 	//For csim (optional, reduce TDM penalty)
 //	if (group!=33) {
@@ -143,7 +154,8 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 	//Perform the DDC
 	//--------
 	iqgroup_uint_t out;
-	ddsddc(accg, data_in.data, out);
+	ddsddc(accg, centers, group, data_in.data, out);
+
 
 	//--------
 	//Output
@@ -152,9 +164,6 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 	data_out.last = group == N_RES_GROUPS-1;
 	data_out.user = group;
 	res_out.write(data_out);
-
-	//Increment cycle
-	cycle++;
 
 //	} //For csim
 

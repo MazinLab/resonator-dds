@@ -21,6 +21,8 @@ typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT_SYM> sample_t;  //-9
 typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT_SYM> sampleout_t; //-7
 typedef ap_fixed<N_TONEBITS, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
 typedef ap_fixed<N_P0BITS, 1, AP_RND_CONV, AP_WRAP> phase_t; //-1-1 wrap
+typedef std::complex<sample_t> loopcenter_t;
+typedef ap_uint<256> loopcenter_group_t;
 typedef ap_uint<256> iqgroup_uint_t;
 
 typedef std::complex<sample_t> sample_complex_t;
