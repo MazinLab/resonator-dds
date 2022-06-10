@@ -5,7 +5,7 @@
 #include <fstream>
 using namespace std;
 
-#define N_CYCLES 16
+#define N_CYCLES 4
 #define TOL 2.5e-5 //1.99031e-005
 //Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
 

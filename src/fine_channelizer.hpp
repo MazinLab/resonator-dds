@@ -25,9 +25,8 @@ typedef ap_uint<256> iqgroup_uint_t;
 
 typedef std::complex<sample_t> sample_complex_t;
 typedef std::complex<sampleout_t> sampleout_complex_t;
-typedef lut_word_t dds18_t;
-typedef ap_fixed<18,1,AP_RND_CONV,AP_WRAP> dds18wrap_t;
-typedef std::complex<dds18_t> dds18_complex_t;
+typedef lut_word_t dds_t;
+typedef std::complex<dds_t> dds_complex_t;
 
 typedef struct {
 	sampleout_complex_t data[N_RES_PCLK];

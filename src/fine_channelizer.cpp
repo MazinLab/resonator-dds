@@ -6,18 +6,28 @@
 using namespace std;
 
 
-void cmpydds(sample_complex_t iq, dds_words_t dds, sampleout_complex_t& p_product) {
-	sample_t a,b;
-	dds18_t c,d;
-	lut_word_t cos_word;
-	lut_word_t sin_word;
-	fine_word_t fine_word;
-	dds18_t ac, ad, bd, bc;
-	sampleout_t r,i;
+void dds(dds_words_t dds, dds_complex_t &ddsv) {
 //#pragma HLS PIPELINE II=1
 //#pragma HLS INTERFACE mode=ap_ctrl_none port=return
 #pragma HLS INLINE
+	dds_t i,r;
+#pragma HLS BIND_OP variable=i op=add
+#pragma HLS BIND_OP variable=i op=sub
+#pragma HLS BIND_OP variable=r op=add
+#pragma HLS BIND_OP variable=r op=sub
+	r=dds.cos_word - dds.sin_word * dds.fine_word;
+	i=dds.sin_word + dds.cos_word * dds.fine_word;
+	ddsv.real(r);
+	ddsv.imag(i);
+}
 
+
+void cmpydds(sample_complex_t iq, dds_words_t dds, sampleout_complex_t& p_product) {
+//#pragma HLS PIPELINE II=1
+//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+#pragma HLS INLINE
+	sample_t a,b;
+	dds_t c,d;
 
 	a=iq.real();
 	b=iq.imag();
@@ -26,29 +36,27 @@ void cmpydds(sample_complex_t iq, dds_words_t dds, sampleout_complex_t& p_produc
 	p_product.real(a*c-b*d);
 	p_product.imag(a*d+b*c);
 
+}
 
-//	if (res==1) {
-//		dds18_complex_t ddsv;
-//		ddsv.real(c);
-//		ddsv.imag(d);
-//		complex<double> x,y,z, iqd,ddsd, resd;
-//		x.real(dds.cos_word.to_double() - dds.sin_word.to_double() * dds.fine_word.to_double());
-//		x.imag(dds.sin_word.to_double() - dds.cos_word.to_double() * dds.fine_word.to_double());
-//		y.real(dds.cos_word - dds.sin_word * dds.fine_word);
-//		y.imag(dds.sin_word - dds.cos_word * dds.fine_word);
-//		iqd.real(a);
-//		iqd.imag(b);
-//		resd=x*iqd;
-////		cout<<endl<<"DoubleDDS "<<x<<" y="<<y<<endl;
-//		cout<<" DDS: "<<ddsv<<" IQ:"<<iq<<"  ="<<p_product<<" gold:"<<resd<<endl;
-//		cout<<"  Bits: "<<std::hex<<" DDS="<<
-//				ddsv.real().range().to_uint()<<", "<<
-//				ddsv.imag().range().to_uint()<<" IQ:"<<
-//				iq.real().range().to_uint()<<", "<<
-//				iq.imag().range().to_uint()<<" IQout:"<<
-//				p_product.real().range().to_uint()<<", "<<
-//				p_product.imag().range().to_uint()<<endl;
-//	}
+
+void cmpy(sample_complex_t iq, dds_complex_t dds, sampleout_complex_t& p_product) {
+//#pragma HLS PIPELINE II=1
+//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+#pragma HLS INLINE
+
+	sampleout_t r,i;
+#pragma HLS BIND_OP variable=i op=add
+#pragma HLS BIND_OP variable=i op=sub
+#pragma HLS BIND_OP variable=r op=add
+#pragma HLS BIND_OP variable=r op=sub
+	ap_fixed<34, 2, AP_RND_CONV, AP_SAT_SYM> ac, ad;
+
+	ac=iq.real()*dds.real();
+	ad=iq.real()*dds.imag();
+	r=ac-iq.imag()*dds.imag();
+	i=ad+iq.imag()*dds.real();
+	p_product.real(r);
+	p_product.imag(i);
 
 }
 
@@ -77,24 +85,19 @@ void ddsddc(const accgroup_t accg, const iqgroup_uint_t in, iqgroup_uint_t &out)
 
 	ddc: for (int i=0; i<N_RES_PCLK; i++) {
 		dds_words_t ddsv;
+		dds_complex_t dds_sincos;
 		sampleout_complex_t iqout;
 		acc_t acc;
 		sample_complex_t iq;
 
 		acc.range()=accg.range(NBITS*(i+1)-1, NBITS*i);
-//		acc=.5;
-
-		phase_to_sincos_wLUT(acc, ddsv);
-
 		iq.real().range()=in.range(32*(i+1)-16-1, 32*i);
 		iq.imag().range()=in.range(32*(i+1)-1, 32*i+16);
-//		if (i==1) {
-//			cout<<"Acc: "<<acc;
-//		}
 
-//		iq[i].real().range()=0x7fff;
-//		iq[i].imag().range()=0;
-		cmpydds(iq, ddsv, iqout);
+		phase_sincos_LUT(acc, ddsv);
+		dds(ddsv, dds_sincos);
+		cmpy(iq, dds_sincos, iqout);
+
 		out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
 		out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
 
@@ -103,8 +106,7 @@ void ddsddc(const accgroup_t accg, const iqgroup_uint_t in, iqgroup_uint_t &out)
 
 
 void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
-				  tonegroup_t tones[N_RES_GROUPS]) {
-
+				   tonegroup_t tones[N_RES_GROUPS]) {
 #pragma HLS INTERFACE ap_ctrl_none port=return
 #pragma HLS INTERFACE s_axilite port=tones
 #pragma HLS INTERFACE axis port=res_in register

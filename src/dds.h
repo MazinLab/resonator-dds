@@ -39,7 +39,7 @@ typedef struct {
 	fine_word_t fine_word;
 } dds_words_t;
 
-void phase_to_sincos_wLUT(acc_t acc, dds_words_t &out);
+void phase_sincos_LUT(acc_t acc, dds_words_t &out);
 
 #endif
 

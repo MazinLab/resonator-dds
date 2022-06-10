@@ -19,10 +19,10 @@ static void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, c
 }
 
 
-void phase_to_sincos_wLUT(acc_t acc, dds_words_t &out) {
+void phase_sincos_LUT(acc_t acc, dds_words_t &out) {
 #pragma HLS INTERFACE mode=ap_ctrl_none port=return
 #pragma HLS AGGREGATE variable=out
-	#pragma HLS PIPELINE
+#pragma HLS PIPELINE II=1
 
 	//Init LUTs
 	lut_word_t cos_lut[LUTSIZE];
