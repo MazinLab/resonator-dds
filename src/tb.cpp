@@ -5,8 +5,8 @@
 #include <fstream>
 using namespace std;
 
-#define N_CYCLES 1
-#define TOL 7e-8
+#define N_CYCLES 16
+#define TOL .333e-4
 //Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
 
 complex<sample_t> genIQ(unsigned int sample, int freq_n, double phase0) {
@@ -18,7 +18,7 @@ complex<sample_t> genIQ(unsigned int sample, int freq_n, double phase0) {
 	 */
 
 	double inc = freq_n*4.096e9/262144.0/1e6; // unitless
-	double amp = 0.5;  //~ 2^-9
+	double amp = 0.98/sqrt(2);  //~ 2^-9
 	double phase = sample*inc + phase0;
 	return complex<sample_t>(amp*cos(M_PI*phase), amp*sin(M_PI*phase));
 }
@@ -93,6 +93,7 @@ int main(){
 				cout<<"premature empty "<<j<<endl;
 				return 1;
 			}
+
 			//Parse data
 			axisdata_t tmpout=res_out_stream.read();
 			for (int ii=0;ii<N_RES_PCLK;ii++){
@@ -101,6 +102,8 @@ int main(){
 			}
 			out.last=tmpout.last;
 			out.user=tmpout.user;
+
+//			if (j!=33) continue;
 
 			//Check user and last
 			if (out.user!=j) {
@@ -129,6 +132,13 @@ int main(){
 				bin_iq=complex<double>(bin_iq_fix.real().to_double(), bin_iq_fix.imag().to_double());
 				ddcd = dds_val*bin_iq;
 
+
+				//Look for loss of bitwidth
+//				sample_complex_t rangetst;
+//				rangetst.real().range()=out.data[k].real().range();
+//				rangetst.imag().range()=out.data[k].imag().range();
+//				cout<<rangetst.real();
+
 				//Compare
 				diff_i=out.data[k].real().to_double()-ddcd.real();
 				diff_q=out.data[k].imag().to_double()-ddcd.imag();
@@ -137,22 +147,16 @@ int main(){
 
 				bool mismatch = abs(diff_i)>TOL || abs(diff_q)>TOL;
 
-//				if (k==0 && j==0) {
-//					cout<<"Mixing DDS "<<phase<<"="<<dds_val<<", inc "<<inc<<" with IQ "<<bin_iq<<" -> ";
-//					cout<<ddcd<<"\n";
-//					cout<<"fix point iq="<<sample_t(bin_iq.real())<<","<<sample_t(bin_iq.imag())<<endl;
-//					cout<<"Core gives: ("<<out[i][j].data[2*k].to_double()<<","<<out[i][j].data[2*k+1].to_double()<<")";
-//					//cout<<" Int: ("<<out[i][j].data[2*k].V<<","<<out[i][j].data[2*k+1].V<<").";
-//					cout<<endl;
-//					cout<<"Delta of ("<<diff_i<<","<<diff_q<<")"<<endl;
-//					if (mismatch) cout<<"MISMATCH: cycle="<<i<<" group="<<j<<" res="<<k<<endl<<endl;
-//				}
+				if (k==1 && j==33) {
+					cout<<"Mixing DDS "<<phase<<"="<<dds_val<<", inc "<<inc<<" with IQ "<<bin_iq<<" -> "<<ddcd<<endl;
+					cout<<" IQfp="<<sample_t(bin_iq.real())<<","<<sample_t(bin_iq.imag())<<endl;
+					cout<<" Core gives: "<<out.data[k]<<endl;
+					cout<<" Delta: ("<<diff_i<<","<<diff_q<<")"<<endl;
+					if (mismatch) cout<<endl<<"MISMATCH: cycle="<<i<<" group="<<j<<" res="<<k<<endl<<endl;
+				}
 				fail|=mismatch;
 
-//				if ((k==0 && j==0) || i>0) {
-//					cout<<tone_id<<", "<<inc<<", "<<bin_iq<<","<<dds_val<<","<<ddcd<<","<<out.data[k]<<endl;
-//				}
-				myfile<<tone_id<<", "<<inc<<", "<<bin_iq<<","<<dds_val<<","<<ddcd<<","<<out.data[k]<<endl;
+				myfile<<j*N_RES_PCLK+k<<", "<<setprecision(numeric_limits<double>::digits10 + 1)<<inc<<", "<<bin_iq<<","<<dds_val<<","<<ddcd<<","<<out.data[k]<<endl;
 			}
 		}
 	}

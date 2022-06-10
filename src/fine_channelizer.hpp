@@ -23,23 +23,14 @@ typedef ap_fixed<N_TONEBITS, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
 typedef ap_fixed<N_P0BITS, 1, AP_RND_CONV, AP_WRAP> phase_t; //-1-1 wrap
 typedef ap_uint<256> iqgroup_uint_t;
 
-typedef complex<sample_t> sample_complex_t;
-typedef complex<sampleout_t> sampleout_complex_t;
+typedef std::complex<sample_t> sample_complex_t;
+typedef std::complex<sampleout_t> sampleout_complex_t;
+typedef lut_word_t dds18_t;
+typedef ap_fixed<18,1,AP_RND_CONV,AP_WRAP> dds18wrap_t;
+typedef std::complex<dds18_t> dds18_complex_t;
 
 typedef struct {
-	sample_t i;
-	sample_t q;
-} iq_t;
-
-typedef ap_uint<32> iq32_t;
-
-typedef struct {
-	sampleout_t i;
-	sampleout_t q;
-} iqout_t;
-
-typedef struct {
-	complex<sampleout_t> data[N_RES_PCLK];
+	sampleout_complex_t data[N_RES_PCLK];
 	bool last;
 	group_t user;
 } resgroupout_t;

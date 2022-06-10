@@ -1,12 +1,6 @@
 #include "dds.h"
 
-//#ifndef __SYNTHESIS__
-//#include <iostream>
-//using namespace std;
-//#endif
 
-
-//______________________________________________________________________________
 static void init_cos_lut( lut_word_t cos_lut[LUTSIZE], const int LUTSIZE ){
 	double cos_double;
 	for (int i=0;i<LUTSIZE;i++) {
@@ -14,7 +8,6 @@ static void init_cos_lut( lut_word_t cos_lut[LUTSIZE], const int LUTSIZE ){
 		cos_lut[i] = cos_double;
 	}
 }
-
 
 
 static void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, const double delta ) {
@@ -26,8 +19,9 @@ static void init_fine_lut( fine_word_t fine_lut[FINESIZE], const int FINESIZE, c
 }
 
 
-void phase_to_sincos_wLUT(acc_t acc, dds18_complex_t &out) {
+void phase_to_sincos_wLUT(acc_t acc, dds_words_t &out) {
 #pragma HLS INTERFACE mode=ap_ctrl_none port=return
+#pragma HLS AGGREGATE variable=out
 	#pragma HLS PIPELINE
 
 	//Init LUTs
@@ -48,7 +42,7 @@ void phase_to_sincos_wLUT(acc_t acc, dds18_complex_t &out) {
 	lut_word_t  cos_lut_word;
 	lut_word_t  sin_lut_word;
 
-//________________ look up cos/sine table
+	// look up cos/sine table
 	full_adr = acc(NBITS-1, NBITS-NLUT-2);  //12 bits  21,10
 	fine_adr = acc(NBITS-NLUT-3, NBITS-NLUT-NFINE-2);  //9 bits  9, 0
 
@@ -99,116 +93,18 @@ void phase_to_sincos_wLUT(acc_t acc, dds18_complex_t &out) {
        }
     }
 
-
     fine_word = fine_lut[fine_adr];
 
-
-//#pragma HLS BIND_OP variable=sin_lut_word op=add impl=dsp
-//#pragma HLS BIND_OP variable=cos_lut_word op=add impl=dsp
-//#pragma HLS BIND_OP variable=fine_word op=add impl=dsp
-//#pragma HLS BIND_OP variable=sin_lut_word op=sub impl=dsp
-//#pragma HLS BIND_OP variable=cos_lut_word op=sub impl=dsp
-//#pragma HLS BIND_OP variable=fine_word op=sub impl=dsp
-
-    out.real(cos_lut_word - sin_lut_word * fine_word);
-    out.imag(sin_lut_word + cos_lut_word * fine_word);
-//    ddsiq32_t tmpout;
-//    dds_t i,q;
-//    i=cos_lut_word - sin_lut_word * fine_word;
-//    q=sin_lut_word + cos_lut_word * fine_word;
-//    tmpout.range(15,0) = i.range();
-//    tmpout.range(31,16) = q.range();
-//    out=tmpout;
+    dds_words_t tout;
+    tout.cos_word=cos_lut_word;
+    tout.sin_word=sin_lut_word;
+    tout.fine_word=fine_word;
+    out=tout;
+//    out.real(cos_lut_word - sin_lut_word * fine_word);
+//    out.imag(sin_lut_word + cos_lut_word * fine_word);
 
 }
 
-
-
-void phase_to_sincos_wLUT(acc_t acc, ddsiq32_t &out) {
-	#pragma HLS PIPELINE
-
-	//Init LUTs
-	lut_word_t cos_lut[LUTSIZE];
-	fine_word_t fine_lut[FINESIZE];
-	init_cos_lut( cos_lut, LUTSIZE );
-	init_fine_lut( fine_lut, FINESIZE, DELTA );
-
-
-	fine_adr_t fine_adr;
-	fine_word_t fine_word;
-
-	lut_adr_t  full_adr;         // cover full quadrant
-	quad_adr_t lsb;              // cover 1/4 quadrant
-	quad_adr_t cos_adr, sin_adr;
-
-	ap_uint<2>  msb;             // specify which quadrant
-	lut_word_t  cos_lut_word;
-	lut_word_t  sin_lut_word;
-
-//________________ look up cos/sine table
-	full_adr = acc(NBITS-1, NBITS-NLUT-2);  //12 bits  21,10
-	fine_adr = acc(NBITS-NLUT-3, NBITS-NLUT-NFINE-2);  //9 bits  9, 0
-
-	msb      = full_adr(NLUT+1, NLUT); //2 bits
-	lsb      = full_adr(NLUT-1,0); //10 bits, quadrant ndx
-
-    // right top
-    if (msb==0) {
-       cos_adr      = lsb;
-       cos_lut_word = cos_lut[cos_adr];
-
-       if (lsb==0) sin_lut_word = 0;
-       else {
-         sin_adr      = -lsb;
-         sin_lut_word =  cos_lut[sin_adr];
-       }
-
-    // left top
-    } else if (msb==1) {
-       if (lsb==0) cos_lut_word = 0;
-       else {
-         cos_adr      = -lsb;
-         cos_lut_word = -cos_lut[cos_adr];
-       }
-
-       sin_adr      = lsb;
-       sin_lut_word = cos_lut[sin_adr];
-
-    // right bot
-    } else if (msb==3) {
-       if (lsb==0) cos_lut_word = 0;
-       else {
-         cos_adr      = -lsb;
-         cos_lut_word =  cos_lut[cos_adr];
-       }
-         sin_adr      =  lsb;
-         sin_lut_word = -cos_lut[sin_adr];
-
-    // left bot
-    } else             {
-         cos_adr      =  lsb;
-         cos_lut_word = -cos_lut[cos_adr];
-
-       if (lsb==0) sin_lut_word = 0;
-       else {
-         sin_adr      = -lsb;
-         sin_lut_word = -cos_lut[sin_adr];
-       }
-    }
-
-
-    fine_word = fine_lut[fine_adr];
-
-
-    ddsiq32_t tmpout;
-    dds_t i,q;
-    i=cos_lut_word - sin_lut_word * fine_word;
-    q=sin_lut_word + cos_lut_word * fine_word;
-    tmpout.range(15,0) = i.range();
-    tmpout.range(31,16) = q.range();
-    out=tmpout;
-
-}
 
 
 
