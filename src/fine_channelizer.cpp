@@ -39,7 +39,7 @@ void cmpydds(sample_complex_t iq, dds_words_t dds, sampleout_complex_t& p_produc
 }
 
 
-void cmpy(sample_complex_t iq, dds_complex_t dds, sampleout_complex_t& p_product) {
+void cmpysub(sample_complex_t iq, sample_complex_t center, dds_complex_t dds, sampleout_complex_t& p_product) {
 //#pragma HLS PIPELINE II=1
 //#pragma HLS INTERFACE mode=ap_ctrl_none port=return
 #pragma HLS INLINE
@@ -53,24 +53,24 @@ void cmpy(sample_complex_t iq, dds_complex_t dds, sampleout_complex_t& p_product
 
 	ac=iq.real()*dds.real();
 	ad=iq.real()*dds.imag();
-	r=ac-iq.imag()*dds.imag();
-	i=ad+iq.imag()*dds.real();
+	r=ac-iq.imag()*dds.imag()-center.real();
+	i=ad+iq.imag()*dds.real()-center.imag();
 	p_product.real(r);
 	p_product.imag(i);
 
 }
 
-void accumulate(const group_t group, tonegroup_t tones[N_RES_GROUPS], accgroup_t &accv, group_t &cycle_out){
+
+void accumulate(group_t groupin, tonegroup_t tones[N_RES_GROUPS], accgroup_t &accv){
 #pragma HLS PIPELINE II=1
 #pragma HLS INTERFACE mode=ap_ctrl_none port=return
-	static group_t cycle;
 	tonegroup_t tonesgroup;
-	cycle_out=cycle;
-	tonesgroup=tones[cycle++];
-
 	static accgroup_t accumulator[N_RES_GROUPS], acc;
-	accumulator[group_t(group-1)]=acc;
-	acc=accumulator[group];
+
+	tonesgroup=tones[groupin];
+	accumulator[group_t(groupin-1)]=acc;
+	acc=accumulator[groupin];
+
 	incp: for (int i=0; i<N_RES_PCLK; i++) {
 		phase_t phase0;
 		toneinc_t inc;
@@ -84,15 +84,28 @@ void accumulate(const group_t group, tonegroup_t tones[N_RES_GROUPS], accgroup_t
 }
 
 
-void ddsddc(const accgroup_t accg, loopcenter_group_t centergroups[], group_t group, const iqgroup_uint_t in, iqgroup_uint_t &out){
+void _ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_complex_t &iqout) {
+//#pragma HLS PIPELINE II=1
+//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+#pragma HLS INLINE
+	sampleout_complex_t tmp;
+	dds_words_t ddsv;
+	dds_complex_t dds_sincos;
+	phase_sincos_LUT(acc, ddsv);
+	dds(ddsv, dds_sincos);
+	cmpysub(iq, center, dds_sincos, iqout);
+}
+
+
+void ddsddc(const accgroup_t accg, loopcenter_group_t centergroups[], group_t group, iqgroup_uint_t in, iqgroup_uint_t &out){
 #pragma HLS PIPELINE II=1
 #pragma HLS INTERFACE mode=ap_ctrl_none port=return
+
 
 	loopcenter_group_t centergroup;
 	centergroup=centergroups[group];
 	ddc: for (int i=0; i<N_RES_PCLK; i++) {
-		dds_words_t ddsv;
-		dds_complex_t dds_sincos;
+
 		sampleout_complex_t iqout;
 		acc_t acc;
 		sample_complex_t iq;
@@ -104,10 +117,7 @@ void ddsddc(const accgroup_t accg, loopcenter_group_t centergroups[], group_t gr
 		center.real().range()=centergroup.range(32*(i+1)-16-1, 32*i);
 		center.imag().range()=centergroup.range(32*(i+1)-1, 32*i+16);
 
-		phase_sincos_LUT(acc, ddsv);
-		dds(ddsv, dds_sincos);
-		cmpy(iq, dds_sincos, iqout);
-		iqout-=center;
+		_ddsddc(acc, iq, center, iqout);
 
 		out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
 		out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
@@ -128,20 +138,16 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 //	while (!res_in.empty()) {  //For csim
 #pragma HLS PIPELINE II=1
 
-//	static group_t cycle;
-	group_t group;
-	axisdata_t data_in, data_out;
-
-	//-----------
-	//Tone and accumulator fetching
-	//-----------
+//	group_t group;
+	accgroup_t accg;
+	iqgroup_uint_t out;
+	axisdata_t data_out, data_in;
 	res_in.read(data_in);
 
 	//--------
 	//Compute phase value
 	//--------
-	accgroup_t accg;
-	accumulate(group, tones, accg, group);
+	accumulate(data_in.user, tones, accg);
 
 	//For csim (optional, reduce TDM penalty)
 //	if (group!=33) {
@@ -153,16 +159,12 @@ void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 	//--------
 	//Perform the DDC
 	//--------
-	iqgroup_uint_t out;
-	ddsddc(accg, centers, group, data_in.data, out);
+	ddsddc(accg, centers, data_in.user, data_in.data, out);
 
-
-	//--------
 	//Output
-	//--------
 	data_out.data = out;
-	data_out.last = group == N_RES_GROUPS-1;
-	data_out.user = group;
+	data_out.last = data_in.last;//group == N_RES_GROUPS-1;
+	data_out.user = data_in.user;
 	res_out.write(data_out);
 
 //	} //For csim
