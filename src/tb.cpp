@@ -18,7 +18,7 @@ complex<sample_t> genIQ(unsigned int sample, int freq_n, double phase0) {
 	 */
 
 	double inc = freq_n*4.096e9/262144.0/1e6; // unitless
-	double amp = 0.98/sqrt(2);  //~ 2^-9
+	double amp = 1.5/sqrt(2);  //~ 2^-9
 	double phase = sample*inc + phase0;
 	return complex<sample_t>(amp*cos(M_PI*phase), amp*sin(M_PI*phase));
 }
@@ -29,6 +29,8 @@ int main(){
 	toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK];
 	phase_t phase0[N_RES_GROUPS][N_RES_PCLK];
 	tonegroup_t tones[N_RES_GROUPS];
+	loopcenter_t centers[N_RES_GROUPS][N_RES_PCLK];
+	loopcenter_group_t centergroups[N_RES_GROUPS];
 	bool fail=false;
 	bool mismatch=false;
 	double maxerror=0;
@@ -49,13 +51,17 @@ int main(){
 
 	//Load in tone-bin center offsets and bin IQ values
 	for (int i=0; i<N_RES_GROUPS*N_RES_PCLK; i++){
-		int group, lane;
+		int group, lane, ctrx, ctry;
 		group=i/N_RES_PCLK;
 		lane=i%N_RES_PCLK;
 		toneinc[group][lane] = toneinc_t(-(i%128 -64)/64.0);
 		phase0[group][lane] = phase_t(-PHASE0);
+		centers[group][lane].real(.1);
+		centers[group][lane].imag(0);
 		tones[group].range(N_TONEBITS*(lane+1)-1, N_TONEBITS*lane)=toneinc[group][lane].range();
 		tones[group].range(N_P0BITS*(lane+1)-1+N_TONEBITS*N_RES_PCLK, N_P0BITS*lane+N_TONEBITS*N_RES_PCLK)=phase0[group][lane].range();
+		centergroups[group].range(32*(lane+1)-16-1, 32*lane)=centers[group][lane].real().range();
+		centergroups[group].range(32*(lane+1)-1, 32*lane+16)=centers[group][lane].imag().range();
 	}
 
 	//Run the DDS
@@ -77,7 +83,7 @@ int main(){
 	}
 
 
-	resonator_dds(res_in_stream, res_out_stream, tones);
+	resonator_ddc(res_in_stream, res_out_stream, tones, centergroups);
 
 
 	//Check results
@@ -138,6 +144,8 @@ int main(){
 //				rangetst.real().range()=out.data[k].real().range();
 //				rangetst.imag().range()=out.data[k].imag().range();
 //				cout<<rangetst.real();
+
+				ddcd.real(ddcd.real()-0.1);
 
 				//Compare
 				diff_i=out.data[k].real().to_double()-ddcd.real();

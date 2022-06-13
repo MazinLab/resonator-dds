@@ -47,6 +47,6 @@ typedef ap_uint<(N_P0BITS+N_TONEBITS)*N_RES_PCLK> tonegroup_t;
 
 typedef ap_uint<NBITS*N_RES_PCLK> accgroup_t;
 
-void resonator_dds(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
-		tonegroup_t tones[N_RES_GROUPS]);
+void resonator_ddc(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
+		tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS]);
 #endif
