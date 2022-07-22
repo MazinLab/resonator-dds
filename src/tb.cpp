@@ -23,25 +23,35 @@ complex<sample_t> genIQ(unsigned int sample, int freq_n, double phase0) {
 	return complex<sample_t>(amp*cos(M_PI*phase), amp*sin(M_PI*phase));
 }
 
+complex<sample_t> quant_iq_for(unsigned int sample, int freq_n, double phase0) {
+
+    complex<double> iq;
+    complex<sample_t> out;
+    iq=iq_for(unsigned int chan, unsigned int sample);
+    out.real(iq.real());
+    out.imag(iq.imag());
+    return out;
+    
+}
+
+complex<double> dds_for(unsigned int chan, unsigned int sample) {
+    //Compute the sin cosine value for the time step
+    double phase;
+    phase = -(tone_for(chan)/1e6*sample+phase0_for(chan))*M_PI;
+    return complex<double>(cos(phase), sin(phase));
+}
+
+
 complex<double> iq_for(unsigned int chan, unsigned int sample) {
-	genIQ(i, tone_for(chan), PHASE0);
-
-	tone_for(chan)*4.096e9/262144.0/1e6;
-	w*t+w0
-	2*pi*f*t+p0
-
-	sample rate is 2MHz
-
-	double phase = toneinc_for(chan)*sample+phase0_for(chan);
-	phase*=M_PI;
+    /* Compute sinusoid value for channel at sample */
+    double phase, amp;
+    amp=amplitude_for(chan);
+    phase = (tone_for(chan)/1e6*sample+phase0_for(chan))*M_PI;
 	return complex<double>(amp*cos(phase), amp*sin(phase));
 }
 
-double toneinc_for(unsigned int chan) {
-	int x=N_RES_GROUPS*N_RES_PCLK/2;
-	float y=x/2.0;
-	//return the tone increment for a channel
-	return ((chan%x) - y)/y;
+double toneinc_for(unsigned int chan) {  //Tones are center relative  ±1 MHZ 1 MHz will repeat every two samples e.g 1, 0, 1, 0, ....
+    return tone_for(chan)/1e6; //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
 }
 
 double tone_for(unsigned int chan) {
@@ -91,12 +101,12 @@ int main(){
 
 	//Load in tone-bin center offsets and bin IQ values
 	for (int i=0; i<N_RES_GROUPS*N_RES_PCLK; i++){
-		int group, lane, ctrx, ctry;
+        int group, lane;
 		group=i/N_RES_PCLK;
 		lane=i%N_RES_PCLK;
 		toneinc[group][lane] = toneinc_t(-toneinc_for(i));
 		phase0[group][lane] = phase_t(-phase0_for(i));
-		centers[group][lane]=center_for(i);
+		centers[group][lane] = center_for(i);
 		tones[group].range(N_TONEBITS*(lane+1)-1, N_TONEBITS*lane)=toneinc[group][lane].range();
 		tones[group].range(N_P0BITS*(lane+1)-1+N_TONEBITS*N_RES_PCLK, N_P0BITS*lane+N_TONEBITS*N_RES_PCLK)=phase0[group][lane].range();
 		centergroups[group].range(32*(lane+1)-16-1, 32*lane)=centers[group][lane].real().range();
@@ -113,10 +123,7 @@ int main(){
 			in.user=j;
 
 			for (int lane=0;lane<N_RES_PCLK;lane++){
-				complex<double> iq;
-				iq=iq_for(j*N_RES_PCLK+lane, i);
-				complex<sample_t> iqquant;
-				iqquant=complex<sample_t>(iq.real(), iq.imag());
+                iqquant=quant_iq_for(j*N_RES_PCLK+lane, i);
 				in.data.range(32*(lane+1)-1-16, 32*lane)=iqquant.real().range();
 				in.data.range(32*(lane+1)-1, 32*lane+16)=iqquant.imag().range();
 			}
@@ -171,23 +178,23 @@ int main(){
 
 				//Compute the sin cosine value for the time step
 				int tone_id=(j*N_RES_PCLK+k)%128-64;
-				inc = tone_id*4.096e9/262144.0/1e6;
-				phase = i*inc + PHASE0;
-				dds_val = complex<double>(cos(-M_PI*phase), sin(-M_PI*phase));
 
+                dds_val = dds_for(j*N_RES_PCLK+k, i);
+                bin_iq_fix = quant_iq_for(j*N_RES_PCLK+k, i);
+                
 				//Complex multiply with the bin
 				bin_iq_fix=genIQ(i, tone_id, PHASE0);
-				bin_iq=complex<double>(bin_iq_fix.real().to_double(), bin_iq_fix.imag().to_double());
+                bin_iq=iq_for(j*N_RES_PCLK+k, i);
 				ddcd = dds_val*bin_iq;
 
-
+                ddcd-=center_for(j*N_RES_PCLK+k);
+                
 				//Look for loss of bitwidth
 //				sample_complex_t rangetst;
 //				rangetst.real().range()=out.data[k].real().range();
 //				rangetst.imag().range()=out.data[k].imag().range();
 //				cout<<rangetst.real();
 
-				ddcd.real(ddcd.real()-0.1);
 
 				//Compare
 				diff_i=out.data[k].real().to_double()-ddcd.real();
