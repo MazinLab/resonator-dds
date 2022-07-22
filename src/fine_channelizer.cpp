@@ -135,7 +135,7 @@ void resonator_ddc(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 #pragma HLS INTERFACE axis port=res_out register
 
 
-//	while (!res_in.empty()) {  //For csim
+	while (!res_in.empty()) {  //For csim
 #pragma HLS PIPELINE II=1
 
 //	group_t group;
@@ -167,6 +167,6 @@ void resonator_ddc(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 	data_out.user = data_in.user;
 	res_out.write(data_out);
 
-//	} //For csim
+	} //For csim
 
 }

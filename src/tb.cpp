@@ -23,6 +23,46 @@ complex<sample_t> genIQ(unsigned int sample, int freq_n, double phase0) {
 	return complex<sample_t>(amp*cos(M_PI*phase), amp*sin(M_PI*phase));
 }
 
+complex<double> iq_for(unsigned int chan, unsigned int sample) {
+	genIQ(i, tone_for(chan), PHASE0);
+
+	tone_for(chan)*4.096e9/262144.0/1e6;
+	w*t+w0
+	2*pi*f*t+p0
+
+	sample rate is 2MHz
+
+	double phase = toneinc_for(chan)*sample+phase0_for(chan);
+	phase*=M_PI;
+	return complex<double>(amp*cos(phase), amp*sin(phase));
+}
+
+double toneinc_for(unsigned int chan) {
+	int x=N_RES_GROUPS*N_RES_PCLK/2;
+	float y=x/2.0;
+	//return the tone increment for a channel
+	return ((chan%x) - y)/y;
+}
+
+double tone_for(unsigned int chan) {
+	int x=N_RES_GROUPS*N_RES_PCLK/2;
+	float y=x/2.0;
+	//return the tone increment for a channel
+	return (chan%x) - y;
+}
+
+double amplitude_for(unsigned int chan) {
+	return 1.5/sqrt(2);
+}
+
+double phase0_for(unsigned int chan) {
+	return .13*chan-.5;
+}
+
+complex<double> center_for(unsigned int chan) {
+	return complex<double>(.2, .43);
+}
+
 
 int main(){
 
@@ -54,10 +94,9 @@ int main(){
 		int group, lane, ctrx, ctry;
 		group=i/N_RES_PCLK;
 		lane=i%N_RES_PCLK;
-		toneinc[group][lane] = toneinc_t(-(i%128 -64)/64.0);
-		phase0[group][lane] = phase_t(-PHASE0);
-		centers[group][lane].real(.1);
-		centers[group][lane].imag(0);
+		toneinc[group][lane] = toneinc_t(-toneinc_for(i));
+		phase0[group][lane] = phase_t(-phase0_for(i));
+		centers[group][lane]=center_for(i);
 		tones[group].range(N_TONEBITS*(lane+1)-1, N_TONEBITS*lane)=toneinc[group][lane].range();
 		tones[group].range(N_P0BITS*(lane+1)-1+N_TONEBITS*N_RES_PCLK, N_P0BITS*lane+N_TONEBITS*N_RES_PCLK)=phase0[group][lane].range();
 		centergroups[group].range(32*(lane+1)-16-1, 32*lane)=centers[group][lane].real().range();
@@ -74,9 +113,12 @@ int main(){
 			in.user=j;
 
 			for (int lane=0;lane<N_RES_PCLK;lane++){
-				complex<sample_t> iq = genIQ(i, (j*N_RES_PCLK+lane)%128-64, PHASE0);
-				in.data.range(32*(lane+1)-1-16, 32*lane)=iq.real().range();
-				in.data.range(32*(lane+1)-1, 32*lane+16)=iq.imag().range();
+				complex<double> iq;
+				iq=iq_for(j*N_RES_PCLK+lane, i);
+				complex<sample_t> iqquant;
+				iqquant=complex<sample_t>(iq.real(), iq.imag());
+				in.data.range(32*(lane+1)-1-16, 32*lane)=iqquant.real().range();
+				in.data.range(32*(lane+1)-1, 32*lane+16)=iqquant.imag().range();
 			}
 			res_in_stream.write(in);
 		}

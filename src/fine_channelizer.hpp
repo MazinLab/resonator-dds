@@ -11,12 +11,13 @@
 #include "dds.h"
 #include "ap_axi_sdata.h"
 
-#define N_RES_GROUPS 256
+#define N_RES_GROUPS 8
+#define N_GROUP_BITS 3
 #define N_RES_PCLK 8
 #define N_TONEBITS 11
 #define N_P0BITS 21
 
-typedef ap_uint<8> group_t;
+typedef ap_uint<N_GROUP_BITS> group_t;
 typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT_SYM> sample_t;  //-9
 typedef ap_fixed<16, 1, AP_RND_CONV, AP_SAT_SYM> sampleout_t; //-7
 typedef ap_fixed<N_TONEBITS, 1, AP_RND_CONV, AP_WRAP> toneinc_t;
