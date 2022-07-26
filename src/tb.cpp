@@ -119,8 +119,15 @@ int main(){
 		}
 	}
 
-	resonator_ddc(res_in_stream, res_out_stream, tones, centergroups);
+//	resonator_ddc(res_in_stream, res_out_stream, tones, centergroups);
 
+
+	hls::stream<axisdata_t> res_out;
+	hls::stream<accgroup_t> accgs;
+	hls::stream<loopcenter_group_t> centergroup;
+	while(!res_in_stream.empty())
+		isolated_accumulator(res_in_stream, centergroups, tones, res_out, accgs, centergroup);
+	isolated_ddsddc(res_out, accgs, centergroup, res_out_stream);
 
 	//Check results
 //	res_out_stream.read();

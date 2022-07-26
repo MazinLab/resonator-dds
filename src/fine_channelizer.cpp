@@ -61,104 +61,6 @@ void _ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_comp
 }
 
 
-void mfetcher(hls::stream<axisdata_t> &res_in, loopcenter_group_t centergroups[N_RES_GROUPS], tonegroup_t tones[N_RES_GROUPS],
-		hls::stream<iqgroup_uint_t> &iq, hls::stream<loopcenter_group_t> &centergroup, hls::stream<tonegroup_t> &tonegroup
-		,hls::stream<group_t> &groupout//, hls::stream<bool> &done
-		) {
-#pragma HLS PIPELINE II=1
-//#pragma HLS INTERFACE mode=ap_ctrl_none
-	static group_t group=0;
-//	inrun: while(!res_in.empty()) {
-//	fetchsamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
-//#pragma HLS PIPELINE II=n_res_group REWIND
-//	fetchrun: for (int group=0;group<N_RES_GROUPS;group++) {
-//	fetchrun: for (int i=0;i<N_RES_GROUPS*N_CYCLES;i++) {
-//#pragma HLS PIPELINE II=1 REWIND
-		axisdata_t data_in;
-		res_in.read(data_in);
-		centergroup.write(centergroups[group]);//data_in.user]);
-		tonegroup.write(tones[group]);//data_in.user]);
-		iq.write(data_in.data);
-		groupout.write(group);//data_in.user);
-		group++;
-//	}
-
-}
-
-//void memory_fetcher(hls::stream<axisdata_t> &res_in, loopcenter_group_t centergroups[N_RES_GROUPS], tonegroup_t tones[N_RES_GROUPS],
-//		hls::stream<iqgroup_uint_t> &iq, hls::stream<loopcenter_group_t> &centergroup, hls::stream<tonegroup_t> &tonegroup
-//		//,hls::stream<group_t> &groupout, hls::stream<bool> &done
-//		) {
-//#pragma HLS INTERFACE mode=ap_ctrl_none
-//	static group_t group=0;
-//	inrun: while(!res_in.empty()) {
-////	fetchsamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
-////#pragma HLS PIPELINE II=n_res_group REWIND
-////	fetchrun: for (int group=0;group<N_RES_GROUPS;group++) {
-////	fetchrun: for (int i=0;i<N_RES_GROUPS*N_CYCLES;i++) {
-//#pragma HLS PIPELINE II=1 REWIND
-//		axisdata_t data_in;
-//		res_in.read(data_in);
-//		centergroup.write(centergroups[group]);//data_in.user]);
-//		tonegroup.write(tones[group++]);//data_in.user]);
-//		iq.write(data_in.data);
-//		//groupout.write(i);//data_in.user);
-////		done.write(false);
-//	}
-////	}
-////	done.write(true);
-//}
-
-
-void accumulate(//hls::stream<bool> &stop,
-		hls::stream<group_t> &groupin,
-		hls::stream<tonegroup_t> &tones, hls::stream<accgroup_t> &accv, hls::stream<group_t> &groupout
-		//, hls::stream<bool> &done
-		){
-
-//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
-
-	static accgroup_t accumulator[N_RES_GROUPS], acc;
-//	static group_t group;
-//#pragma HLS DEPENDENCE dependent=true direction=RAW distance=256 type=inter variable=accumulator
-
-//	for (int i=0;i<N_RES_GROUPS;i++) accumulator[i]=0;
-
-////	accrun: while (!stop.read()) {
-//	accsamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
-////#pragma HLS PIPELINE II=n_res_group REWIND
-//	acc: for (int group=0;group<N_RES_GROUPS;group++) {
-#pragma HLS PIPELINE II=1
-
-		accgroup_t _accv,_acc;
-		tonegroup_t tonesgroup;
-//		accgroup_t acc;
-
-		group_t group, lgroup;
-		group=groupin.read();
-		lgroup=group-1;
-		tones.read(tonesgroup);
-		accumulator[lgroup]=acc;
-		_acc=accumulator[group];
-
-		incp: for (int i=0; i<N_RES_PCLK; i++) {
-			phase_t phase0;
-			toneinc_t inc;
-			acc_t tmp;
-			inc.range()=tonesgroup.range(N_TONEBITS*(i+1)-1, N_TONEBITS*i);
-			phase0.range()=tonesgroup.range(N_P0BITS*(i+1)-1+N_TONEBITS*N_RES_PCLK,N_P0BITS*i+N_TONEBITS*N_RES_PCLK);
-			tmp.range()=_acc.range(NBITS*(i+1)-1, NBITS*i);
-			_accv.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+phase0).range();
-			_acc.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+inc).range();
-		}
-
-		acc=_acc;
-		accv.write(_accv);
-		groupout.write(group);
-
-}
-
-
 void ddsddc(//hls::stream<bool> &done,
 		hls::stream<group_t> &groupin,
 		hls::stream<accgroup_t> &accgs, hls::stream<iqgroup_uint_t> &in,
@@ -212,42 +114,106 @@ void ddsddc(//hls::stream<bool> &done,
 }
 
 
-void resonator_ddc(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
-				   tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS]) {
-//#pragma HLS INTERFACE ap_ctrl_none port=return
-#pragma HLS INTERFACE s_axilite port=tones
-#pragma HLS INTERFACE s_axilite port=centers
+void isolated_accumulator(hls::stream<axisdata_t> &res_in,
+		loopcenter_group_t centergroups[N_RES_GROUPS], tonegroup_t tones[N_RES_GROUPS],
+		hls::stream<axisdata_t> &res_out, hls::stream<accgroup_t> &accout, hls::stream<loopcenter_group_t> &centergroup) {
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_in
+#pragma HLS INTERFACE mode=axis register_mode=off port=accout
+#pragma HLS INTERFACE mode=axis register_mode=off port=centergroup
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_out
+#pragma HLS INTERFACE ap_ctrl_none port=return
+#pragma HLS INTERFACE s_axilite port=tones
+#pragma HLS INTERFACE s_axilite port=centergroups
 
-	fetchrun: for (int i=0;i<N_RES_GROUPS*N_CYCLES;i++) {
-#pragma HLS DATAFLOW
+	static accgroup_t accumulator[N_RES_GROUPS], acc;
+
+//	while (true){
+	#pragma HLS PIPELINE II=1 REWIND
+
+		axisdata_t data_in;
+		res_in.read(data_in);
+//		if(!res_in.read_nb(data_in)) break;
+
+		group_t group, lgroup;
+		group=data_in.user;
+		lgroup=group-1;
+		centergroup.write(centergroups[group]);
+
+		tonegroup_t tonesgroup;
+		tonesgroup = tones[group];
+		res_out.write(data_in);
+
+		accgroup_t _accv,_acc;
+
+		accumulator[lgroup]=acc;
+		_acc=accumulator[group];
+
+		incp: for (int i=0; i<N_RES_PCLK; i++) {
+			phase_t phase0;
+			toneinc_t inc;
+			acc_t tmp;
+
+			inc.range()=tonesgroup.range(N_TONEBITS*(i+1)-1, N_TONEBITS*i);
+			phase0.range()=tonesgroup.range(N_P0BITS*(i+1)-1+N_TONEBITS*N_RES_PCLK,N_P0BITS*i+N_TONEBITS*N_RES_PCLK);
+
+			tmp.range()=_acc.range(NBITS*(i+1)-1, NBITS*i);
+			_accv.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+phase0).range();
+			_acc.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+inc).range();
+		}
+
+		acc=_acc;
+		accout.write(_accv);
+//		if (res_in.empty()) break;
+//	}
+}
 
 
-	hls::stream<iqgroup_uint_t> iq;
-	hls::stream<bool> done, done2;
-	hls::stream<loopcenter_group_t> centergroup;
-	hls::stream<tonegroup_t> tonegroup;
-	hls::stream<group_t> group, group2;
-	hls::stream<accgroup_t> accg;
-#pragma HLS STREAM variable=iq depth=16
-#pragma HLS STREAM variable=done depth=10
-#pragma HLS STREAM variable=done2 depth=2 //1
-#pragma HLS STREAM variable=centergroup depth=16
-#pragma HLS STREAM variable=tonegroup depth=10
-#pragma HLS STREAM variable=group depth=10
-#pragma HLS STREAM variable=group2 depth=3
-#pragma HLS STREAM variable=accg depth=3
+void isolated_ddsddc(
+		hls::stream<axisdata_t> &res_in,
+		hls::stream<accgroup_t> &accgs,
+		hls::stream<loopcenter_group_t> &centergroup,
+		hls::stream<axisdata_t> &res_out) {
+#pragma HLS INTERFACE mode=axis register_mode=off port=res_in
+#pragma HLS INTERFACE mode=axis register_mode=off port=accgs
+#pragma HLS INTERFACE mode=axis register_mode=off port=centergroup
+#pragma HLS INTERFACE mode=axis register_mode=off port=res_out
+#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+
+	while (true){
+	#pragma HLS PIPELINE II=1 REWIND
+			iqgroup_uint_t _out;
+			accgroup_t accg;
+			loopcenter_group_t centergroupv;
+			axisdata_t data_out, data_in;
+
+			if(!res_in.read_nb(data_in)) break;
+			accgs.read(accg);
+			centergroup.read(centergroupv);
 
 
-		//Fetch incoming values and data from BRAM
-		mfetcher(res_in, centers, tones, iq, centergroup, tonegroup, group);
+			ddc: for (int i=0; i<N_RES_PCLK; i++) {
+				sampleout_complex_t iqout;
+				acc_t acc;
+				sample_complex_t iq;
+				loopcenter_t center;
 
-		//Compute phase value
-		accumulate(group, tonegroup, accg, group2);//, done2);
+				acc.range()=accg.range(NBITS*(i+1)-1, NBITS*i);
 
-		//Compute DDS from phase accumulator, DDC, and center
-		ddsddc(group2, accg, iq, centergroup, res_out);
+				iq.real().range()=data_in.data.range(32*(i+1)-16-1, 32*i);
+				iq.imag().range()=data_in.data.range(32*(i+1)-1, 32*i+16);
+
+				center.real().range()=centergroupv.range(32*(i+1)-16-1, 32*i);
+				center.imag().range()=centergroupv.range(32*(i+1)-1, 32*i+16);
+
+				_ddsddc(acc, iq, center, iqout);
+
+				_out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
+				_out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
+			}
+
+			data_out.data = _out;
+			data_out.last = data_in.last;
+			data_out.user = data_in.user;
+			res_out.write(data_out);
 	}
-
 }
