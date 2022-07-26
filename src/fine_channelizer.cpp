@@ -7,8 +7,6 @@ using namespace std;
 
 
 void dds(dds_words_t dds, dds_complex_t &ddsv) {
-//#pragma HLS PIPELINE II=1
-//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
 #pragma HLS INLINE
 	dds_t i,r;
 #pragma HLS BIND_OP variable=i op=add
@@ -22,26 +20,8 @@ void dds(dds_words_t dds, dds_complex_t &ddsv) {
 }
 
 
-void cmpydds(sample_complex_t iq, dds_words_t dds, sampleout_complex_t& p_product) {
-//#pragma HLS PIPELINE II=1
-//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
-#pragma HLS INLINE
-	sample_t a,b;
-	dds_t c,d;
-
-	a=iq.real();
-	b=iq.imag();
-	c=dds.cos_word - dds.sin_word * dds.fine_word;
-	d=dds.sin_word + dds.cos_word * dds.fine_word;
-	p_product.real(a*c-b*d);
-	p_product.imag(a*d+b*c);
-
-}
-
 
 void cmpysub(sample_complex_t iq, sample_complex_t center, dds_complex_t dds, sampleout_complex_t& p_product) {
-//#pragma HLS PIPELINE II=1
-//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
 #pragma HLS INLINE
 
 	sampleout_t r,i;
@@ -51,22 +31,45 @@ void cmpysub(sample_complex_t iq, sample_complex_t center, dds_complex_t dds, sa
 #pragma HLS BIND_OP variable=r op=sub
 	ap_fixed<34, 2, AP_RND_CONV, AP_SAT_SYM> ac, ad;
 
+
 	ac=iq.real()*dds.real();
 	ad=iq.real()*dds.imag();
 	r=ac-iq.imag()*dds.imag()-center.real();
 	i=ad+iq.imag()*dds.real()-center.imag();
 	p_product.real(r);
 	p_product.imag(i);
+//#ifndef __SYNTHESIS__
+//
+//	cout<<"-----\nIQ: "<<iq.real()<<" DDS: "<<dds.real()<<" Ctr:"<<center.real()<<endl;
+//	cout<<"ac: "<<ac<<" bd: "<<(iq.imag()*dds.imag())<<" rval:"<<ac-iq.imag()*dds.imag()-center.real()<<" r: "<<r<<endl;
+//	cout<<"Result: "<<p_product.real()<<endl;
+//
+//	cout<<"IQ: "<<iq.real().range().to_int()<<" DDS: "<<dds.real().range().to_int()<<" Ctr:"<<center.real().range().to_int()<<endl;
+//	cout<<"ac: "<<ac.range().to_int64()<<" bd: "<<(iq.imag()*dds.imag()).range().to_int64()<<" r: "<<r.range().to_int64()<<endl;
+//	cout<<"Result: "<<p_product.real().range().to_int()<<"\n-----"<<endl;
+//#endif
 
 }
 
 
-void accumulate(group_t groupin, tonegroup_t tones[N_RES_GROUPS], accgroup_t &accv){
+void _ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_complex_t &iqout) {
+#pragma HLS INLINE
+	sampleout_complex_t tmp;
+	dds_words_t ddsv;
+	dds_complex_t dds_sincos;
+	phase_sincos_LUT(acc, ddsv);
+	dds(ddsv, dds_sincos);
+	cmpysub(iq, center, dds_sincos, iqout);
+}
+
+
+void accumulate(group_t groupin, tonegroup_t tones[N_RES_GROUPS], hls::stream<accgroup_t> &accv){
 #pragma HLS PIPELINE II=1
-#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
 	tonegroup_t tonesgroup;
 	static accgroup_t accumulator[N_RES_GROUPS], acc;
 
+	accgroup_t _accv,_acc;
 	tonesgroup=tones[groupin];
 	accumulator[group_t(groupin-1)]=acc;
 	acc=accumulator[groupin];
@@ -78,30 +81,21 @@ void accumulate(group_t groupin, tonegroup_t tones[N_RES_GROUPS], accgroup_t &ac
 		inc.range()=tonesgroup.range(N_TONEBITS*(i+1)-1, N_TONEBITS*i);
 		phase0.range()=tonesgroup.range(N_P0BITS*(i+1)-1+N_TONEBITS*N_RES_PCLK,N_P0BITS*i+N_TONEBITS*N_RES_PCLK);
 		tmp.range()=acc.range(NBITS*(i+1)-1, NBITS*i);
-		accv.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+phase0).range();
-		acc.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+inc).range();
+		_accv.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+phase0).range();
+		_acc.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+inc).range();
 	}
+	accv.write(_accv);
+	acc=_acc;
 }
 
 
-void _ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_complex_t &iqout) {
-//#pragma HLS PIPELINE II=1
-//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
-#pragma HLS INLINE
-	sampleout_complex_t tmp;
-	dds_words_t ddsv;
-	dds_complex_t dds_sincos;
-	phase_sincos_LUT(acc, ddsv);
-	dds(ddsv, dds_sincos);
-	cmpysub(iq, center, dds_sincos, iqout);
-}
-
-
-void ddsddc(const accgroup_t accg, loopcenter_group_t centergroups[], group_t group, iqgroup_uint_t in, iqgroup_uint_t &out){
+void ddsddc(hls::stream<accgroup_t> &accgs, loopcenter_group_t centergroups[N_RES_GROUPS], group_t group, iqgroup_uint_t in, hls::stream<axisdata_t> &res_out){
 #pragma HLS PIPELINE II=1
-#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+//#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+	iqgroup_uint_t _out;
 
-
+	accgroup_t accg;
+	accg=accgs.read();
 	loopcenter_group_t centergroup;
 	centergroup=centergroups[group];
 	ddc: for (int i=0; i<N_RES_PCLK; i++) {
@@ -119,54 +113,58 @@ void ddsddc(const accgroup_t accg, loopcenter_group_t centergroups[], group_t gr
 
 		_ddsddc(acc, iq, center, iqout);
 
-		out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
-		out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
+		_out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
+		_out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
 
 	}
+//	out=_out;
+	axisdata_t data_out;
+	data_out.data = _out;
+	data_out.last = group == N_RES_GROUPS-1;
+	data_out.user = group;
+	res_out.write(data_out);
 }
 
 
 void resonator_ddc(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
 				   tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS]) {
-#pragma HLS INTERFACE ap_ctrl_none port=return
+//#pragma HLS INTERFACE ap_ctrl_none port=return
 #pragma HLS INTERFACE s_axilite port=tones
 #pragma HLS INTERFACE s_axilite port=centers
-#pragma HLS INTERFACE axis port=res_in register
-#pragma HLS INTERFACE axis port=res_out register
+#pragma HLS INTERFACE mode=axis register_mode=off port=res_in
+#pragma HLS INTERFACE mode=axis register_mode=off port=res_out
 
 
 	while (!res_in.empty()) {  //For csim
 #pragma HLS PIPELINE II=1
 
-//	group_t group;
-	accgroup_t accg;
-	iqgroup_uint_t out;
-	axisdata_t data_out, data_in;
+		hls::stream<accgroup_t> accg;
+	#pragma HLS STREAM variable=accg depth=4
+//	static group_t group;
+
+//	iqgroup_uint_t out;
+	axisdata_t data_in;
 	res_in.read(data_in);
+//	group=group
 
 	//--------
 	//Compute phase value
 	//--------
 	accumulate(data_in.user, tones, accg);
 
-	//For csim (optional, reduce TDM penalty)
-//	if (group!=33) {
-//		res_out.write(data_out);
-//		cycle++;
-//		continue;
-//	}
 
 	//--------
 	//Perform the DDC
 	//--------
-	ddsddc(accg, centers, data_in.user, data_in.data, out);
+	ddsddc(accg, centers, data_in.user, data_in.data, res_out);
 
-	//Output
-	data_out.data = out;
-	data_out.last = data_in.last;//group == N_RES_GROUPS-1;
-	data_out.user = data_in.user;
-	res_out.write(data_out);
+//	//Output
+//	data_out.data = out;
+//	data_out.last = group == N_RES_GROUPS-1;
+//	data_out.user = group;//data_in.user;
+//	res_out.write(data_out);
 
+//	group++;
 	} //For csim
 
 }
