@@ -5,40 +5,63 @@
 #include <fstream>
 using namespace std;
 
-#define N_CYCLES 4
-#define TOL 2.5e-5 //1.99031e-005
+#define N_CYCLES 10
+#define TOL 6e-5 //1.99031e-005
 //Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
+//
+//complex<sample_t> genIQ(unsigned int sample, int freq_n, double phase0) {
+//	/*
+//	 *  Generate a sinusoid sampled at 2MHz with a frequency of +- n* 4.096e9/(262144*16) in the interval (-1,+1] MHz
+//	 *  and an amplitude that uses up most of the range of  ap_fixed<16, -9>?
+//	 *
+//	 *  freq_n should be in range -64,64
+//	 */
+//
+//	double inc = freq_n*4.096e9/262144.0/1e6; // unitless
+//	double amp = 0.06;//1.5/sqrt(2);  //~ 2^-9
+//	double phase = sample*inc + phase0;
+//	return complex<sample_t>(amp*cos(M_PI*phase), amp*sin(M_PI*phase));
+//}
+//
+//
+//
+//
+//
 
-complex<sample_t> genIQ(unsigned int sample, int freq_n, double phase0) {
-	/*
-	 *  Generate a sinusoid sampled at 2MHz with a frequency of +- n* 4.096e9/(262144*16) in the interval (-1,+1] MHz
-	 *  and an amplitude that uses up most of the range of  ap_fixed<16, -9>?
-	 *
-	 *  freq_n should be in range -64,64
-	 */
 
-	double inc = freq_n*4.096e9/262144.0/1e6; // unitless
-	double amp = 1.5/sqrt(2);  //~ 2^-9
-	double phase = sample*inc + phase0;
-	return complex<sample_t>(amp*cos(M_PI*phase), amp*sin(M_PI*phase));
+
+double tone_for(unsigned int chan) {
+	int x=N_RES_GROUPS*N_RES_PCLK/2;
+	float y=x/2.0;
+	//return the tone increment for a channel
+	return (chan%x) - y;
 }
 
-complex<sample_t> quant_iq_for(unsigned int sample, int freq_n, double phase0) {
 
-    complex<double> iq;
-    complex<sample_t> out;
-    iq=iq_for(unsigned int chan, unsigned int sample);
-    out.real(iq.real());
-    out.imag(iq.imag());
-    return out;
-    
+double amplitude_for(unsigned int chan) {
+	return 0.06;//1.5/sqrt(2);
 }
+
+double phase0_for(unsigned int chan) {
+	return .13*chan-.5;
+}
+
+double toneinc_for(unsigned int chan) {  //Tones are center relative  ±1 MHZ 1 MHz will repeat every two samples e.g 1, 0, 1, 0, ....
+    return tone_for(chan)/1e6; //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
+}
+
 
 complex<double> dds_for(unsigned int chan, unsigned int sample) {
     //Compute the sin cosine value for the time step
     double phase;
     phase = -(tone_for(chan)/1e6*sample+phase0_for(chan))*M_PI;
     return complex<double>(cos(phase), sin(phase));
+}
+
+
+
+complex<double> center_for(unsigned int chan) {
+	return complex<double>(.2, .43);
 }
 
 
@@ -50,29 +73,16 @@ complex<double> iq_for(unsigned int chan, unsigned int sample) {
 	return complex<double>(amp*cos(phase), amp*sin(phase));
 }
 
-double toneinc_for(unsigned int chan) {  //Tones are center relative  ±1 MHZ 1 MHz will repeat every two samples e.g 1, 0, 1, 0, ....
-    return tone_for(chan)/1e6; //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
-}
+complex<sample_t> quant_iq_for(unsigned int chan, unsigned int sample) {
 
-double tone_for(unsigned int chan) {
-	int x=N_RES_GROUPS*N_RES_PCLK/2;
-	float y=x/2.0;
-	//return the tone increment for a channel
-	return (chan%x) - y;
-}
+    complex<double> iq;
+    complex<sample_t> out;
+    iq=iq_for(chan, sample);
+    out.real(iq.real());
+    out.imag(iq.imag());
+    return out;
 
-double amplitude_for(unsigned int chan) {
-	return 1.5/sqrt(2);
 }
-
-double phase0_for(unsigned int chan) {
-	return .13*chan-.5;
-}
-
-complex<double> center_for(unsigned int chan) {
-	return complex<double>(.2, .43);
-}
-
 
 int main(){
 
@@ -113,8 +123,12 @@ int main(){
 		centergroups[group].range(32*(lane+1)-1, 32*lane+16)=centers[group][lane].imag().range();
 	}
 
+
+
 	//Run the DDS
 	hls::stream<axisdata_t> res_in_stream, res_out_stream;
+
+	//resonator_ddc(res_in_stream, res_out_stream, tones, centergroups);
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
 		//Run the DDS on the data
 		for (int j=0;j<N_RES_GROUPS;j++){
@@ -123,6 +137,7 @@ int main(){
 			in.user=j;
 
 			for (int lane=0;lane<N_RES_PCLK;lane++){
+				complex<sample_t> iqquant;
                 iqquant=quant_iq_for(j*N_RES_PCLK+lane, i);
 				in.data.range(32*(lane+1)-1-16, 32*lane)=iqquant.real().range();
 				in.data.range(32*(lane+1)-1, 32*lane+16)=iqquant.imag().range();
@@ -131,12 +146,12 @@ int main(){
 		}
 	}
 
-
 	resonator_ddc(res_in_stream, res_out_stream, tones, centergroups);
 
 
 	//Check results
-
+//	res_out_stream.read();
+//	res_out_stream.read();
 	resgroupout_t out;
     ofstream myfile;
   	myfile.open("result16_8_17.txt");
@@ -183,7 +198,7 @@ int main(){
                 bin_iq_fix = quant_iq_for(j*N_RES_PCLK+k, i);
                 
 				//Complex multiply with the bin
-				bin_iq_fix=genIQ(i, tone_id, PHASE0);
+//				bin_iq_fix=genIQ(i, tone_id, PHASE0);
                 bin_iq=iq_for(j*N_RES_PCLK+k, i);
 				ddcd = dds_val*bin_iq;
 
@@ -204,7 +219,7 @@ int main(){
 
 				bool mismatch = abs(diff_i)>TOL || abs(diff_q)>TOL;
 
-				if (k==1 && j==33) {
+				if (mismatch || k==1 && j==33) {
 					cout<<"Mixing DDS "<<phase<<"="<<dds_val<<", inc "<<inc<<" with IQ "<<bin_iq<<" -> "<<ddcd<<endl;
 					cout<<" IQfp="<<sample_t(bin_iq.real())<<","<<sample_t(bin_iq.imag())<<endl;
 					cout<<" Core gives: "<<out.data[k]<<endl;
