@@ -5,29 +5,8 @@
 #include <fstream>
 using namespace std;
 
-#define N_CYCLES 10
 #define TOL 6e-5 //1.99031e-005
 //Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
-//
-//complex<sample_t> genIQ(unsigned int sample, int freq_n, double phase0) {
-//	/*
-//	 *  Generate a sinusoid sampled at 2MHz with a frequency of +- n* 4.096e9/(262144*16) in the interval (-1,+1] MHz
-//	 *  and an amplitude that uses up most of the range of  ap_fixed<16, -9>?
-//	 *
-//	 *  freq_n should be in range -64,64
-//	 */
-//
-//	double inc = freq_n*4.096e9/262144.0/1e6; // unitless
-//	double amp = 0.06;//1.5/sqrt(2);  //~ 2^-9
-//	double phase = sample*inc + phase0;
-//	return complex<sample_t>(amp*cos(M_PI*phase), amp*sin(M_PI*phase));
-//}
-//
-//
-//
-//
-//
-
 
 
 double tone_for(unsigned int chan) {
@@ -37,19 +16,21 @@ double tone_for(unsigned int chan) {
 	return (chan%x) - y;
 }
 
+complex<double> center_for(unsigned int chan) {
+	return complex<double>(.003, -.007);
+}
 
 double amplitude_for(unsigned int chan) {
 	return 0.06;//1.5/sqrt(2);
 }
 
 double phase0_for(unsigned int chan) {
-	return .13*chan-.5;
+	return chan/(N_RES_GROUPS*N_RES_PCLK*1.0)*.5;//.13*chan-.5;
 }
 
 double toneinc_for(unsigned int chan) {  //Tones are center relative  ±1 MHZ 1 MHz will repeat every two samples e.g 1, 0, 1, 0, ....
     return tone_for(chan)/1e6; //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
 }
-
 
 complex<double> dds_for(unsigned int chan, unsigned int sample) {
     //Compute the sin cosine value for the time step
@@ -57,13 +38,6 @@ complex<double> dds_for(unsigned int chan, unsigned int sample) {
     phase = -(tone_for(chan)/1e6*sample+phase0_for(chan))*M_PI;
     return complex<double>(cos(phase), sin(phase));
 }
-
-
-
-complex<double> center_for(unsigned int chan) {
-	return complex<double>(.2, .43);
-}
-
 
 complex<double> iq_for(unsigned int chan, unsigned int sample) {
     /* Compute sinusoid value for channel at sample */
@@ -128,7 +102,6 @@ int main(){
 	//Run the DDS
 	hls::stream<axisdata_t> res_in_stream, res_out_stream;
 
-	//resonator_ddc(res_in_stream, res_out_stream, tones, centergroups);
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
 		//Run the DDS on the data
 		for (int j=0;j<N_RES_GROUPS;j++){
@@ -159,6 +132,7 @@ int main(){
 		cout<<"Cycle "<<i<<endl;
 		myfile<<"#Cycle "<<i<<endl;
 		for (int j=0;j<N_RES_GROUPS;j++) { //takes N_RES_GROUPS cycles to get through each resonator once
+
 			if (res_out_stream.empty()){
 				cout<<"premature empty "<<j<<endl;
 				return 1;
@@ -187,7 +161,7 @@ int main(){
 
 			//Compare the result
 			for (int k=0;k<N_RES_PCLK;k++) {
-				complex<double> dds_val, bin_iq, ddcd;
+				complex<double> dds_val, bin_iq, ddcd, centerv;
 				complex<sample_t> bin_iq_fix;
 				double phase, inc, diff_i, diff_q; //0-1, increments by the tone increment each cycle
 
@@ -196,14 +170,11 @@ int main(){
 
                 dds_val = dds_for(j*N_RES_PCLK+k, i);
                 bin_iq_fix = quant_iq_for(j*N_RES_PCLK+k, i);
-                
-				//Complex multiply with the bin
-//				bin_iq_fix=genIQ(i, tone_id, PHASE0);
                 bin_iq=iq_for(j*N_RES_PCLK+k, i);
-				ddcd = dds_val*bin_iq;
+				centerv=center_for(j*N_RES_PCLK+k);
 
-                ddcd-=center_for(j*N_RES_PCLK+k);
-                
+				ddcd = dds_val*bin_iq - centerv;
+
 				//Look for loss of bitwidth
 //				sample_complex_t rangetst;
 //				rangetst.real().range()=out.data[k].real().range();
@@ -220,8 +191,9 @@ int main(){
 				bool mismatch = abs(diff_i)>TOL || abs(diff_q)>TOL;
 
 				if (mismatch || k==1 && j==33) {
-					cout<<"Mixing DDS "<<phase<<"="<<dds_val<<", inc "<<inc<<" with IQ "<<bin_iq<<" -> "<<ddcd<<endl;
-					cout<<" IQfp="<<sample_t(bin_iq.real())<<","<<sample_t(bin_iq.imag())<<endl;
+					cout<<"Phase="<<phase<<" Mixing IQ*DDS - center:"<<endl;
+					cout<<bin_iq<<" * "<<dds_val<<" - "<<centerv<<" = "<<ddcd<<endl;
+//					cout<<" IQfp="<<sample_t(bin_iq.real())<<","<<sample_t(bin_iq.imag())<<endl;
 					cout<<" Core gives: "<<out.data[k]<<endl;
 					cout<<" Delta: ("<<diff_i<<","<<diff_q<<")"<<endl;
 					if (mismatch) cout<<endl<<"MISMATCH: cycle="<<i<<" group="<<j<<" res="<<k<<endl<<endl;
