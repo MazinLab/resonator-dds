@@ -61,54 +61,85 @@ void _ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_comp
 }
 
 
-void memory_fetcher(hls::stream<axisdata_t> &res_in, loopcenter_group_t centergroups[N_RES_GROUPS], tonegroup_t tones[N_RES_GROUPS],
+void mfetcher(hls::stream<axisdata_t> &res_in, loopcenter_group_t centergroups[N_RES_GROUPS], tonegroup_t tones[N_RES_GROUPS],
 		hls::stream<iqgroup_uint_t> &iq, hls::stream<loopcenter_group_t> &centergroup, hls::stream<tonegroup_t> &tonegroup
-		//,hls::stream<group_t> &groupout, hls::stream<bool> &done
+		,hls::stream<group_t> &groupout//, hls::stream<bool> &done
 		) {
-
+#pragma HLS PIPELINE II=1
+//#pragma HLS INTERFACE mode=ap_ctrl_none
+	static group_t group=0;
 //	inrun: while(!res_in.empty()) {
-	fetchsamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
+//	fetchsamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
 //#pragma HLS PIPELINE II=n_res_group REWIND
-	fetchrun: for (int group=0;group<N_RES_GROUPS;group++) {
-#pragma HLS PIPELINE II=1 REWIND
+//	fetchrun: for (int group=0;group<N_RES_GROUPS;group++) {
+//	fetchrun: for (int i=0;i<N_RES_GROUPS*N_CYCLES;i++) {
+//#pragma HLS PIPELINE II=1 REWIND
 		axisdata_t data_in;
 		res_in.read(data_in);
 		centergroup.write(centergroups[group]);//data_in.user]);
 		tonegroup.write(tones[group]);//data_in.user]);
 		iq.write(data_in.data);
-		//groupout.write(i);//data_in.user);
-//		done.write(false);
-	}
-	}
-//	done.write(true);
+		groupout.write(group);//data_in.user);
+		group++;
+//	}
+
 }
 
+//void memory_fetcher(hls::stream<axisdata_t> &res_in, loopcenter_group_t centergroups[N_RES_GROUPS], tonegroup_t tones[N_RES_GROUPS],
+//		hls::stream<iqgroup_uint_t> &iq, hls::stream<loopcenter_group_t> &centergroup, hls::stream<tonegroup_t> &tonegroup
+//		//,hls::stream<group_t> &groupout, hls::stream<bool> &done
+//		) {
+//#pragma HLS INTERFACE mode=ap_ctrl_none
+//	static group_t group=0;
+//	inrun: while(!res_in.empty()) {
+////	fetchsamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
+////#pragma HLS PIPELINE II=n_res_group REWIND
+////	fetchrun: for (int group=0;group<N_RES_GROUPS;group++) {
+////	fetchrun: for (int i=0;i<N_RES_GROUPS*N_CYCLES;i++) {
+//#pragma HLS PIPELINE II=1 REWIND
+//		axisdata_t data_in;
+//		res_in.read(data_in);
+//		centergroup.write(centergroups[group]);//data_in.user]);
+//		tonegroup.write(tones[group++]);//data_in.user]);
+//		iq.write(data_in.data);
+//		//groupout.write(i);//data_in.user);
+////		done.write(false);
+//	}
+////	}
+////	done.write(true);
+//}
 
-void accumulate(//hls::stream<bool> &stop, hls::stream<group_t> &groupin,
-		hls::stream<tonegroup_t> &tones, hls::stream<accgroup_t> &accv//, hls::stream<group_t> &groupout, hls::stream<bool> &done
+
+void accumulate(//hls::stream<bool> &stop,
+		hls::stream<group_t> &groupin,
+		hls::stream<tonegroup_t> &tones, hls::stream<accgroup_t> &accv, hls::stream<group_t> &groupout
+		//, hls::stream<bool> &done
 		){
 
 //#pragma HLS INTERFACE mode=ap_ctrl_none port=return
 
-	static accgroup_t accumulator[N_RES_GROUPS];
-#pragma HLS DEPENDENCE dependent=true direction=RAW distance=256 type=inter variable=accumulator
+	static accgroup_t accumulator[N_RES_GROUPS], acc;
+//	static group_t group;
+//#pragma HLS DEPENDENCE dependent=true direction=RAW distance=256 type=inter variable=accumulator
 
 //	for (int i=0;i<N_RES_GROUPS;i++) accumulator[i]=0;
 
-//	accrun: while (!stop.read()) {
-	accsamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
-//#pragma HLS PIPELINE II=n_res_group REWIND
-	acc: for (int group=0;group<N_RES_GROUPS;group++) {
-#pragma HLS PIPELINE II=1 REWIND
+////	accrun: while (!stop.read()) {
+//	accsamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
+////#pragma HLS PIPELINE II=n_res_group REWIND
+//	acc: for (int group=0;group<N_RES_GROUPS;group++) {
+#pragma HLS PIPELINE II=1
 
 		accgroup_t _accv,_acc;
 		tonegroup_t tonesgroup;
-		accgroup_t acc;
+//		accgroup_t acc;
 
-//		group_t group;
-//		groupin.read(group);
+		group_t group, lgroup;
+		group=groupin.read();
+		lgroup=group-1;
 		tones.read(tonesgroup);
-		acc=accumulator[group];
+		accumulator[lgroup]=acc;
+		_acc=accumulator[group];
 
 		incp: for (int i=0; i<N_RES_PCLK; i++) {
 			phase_t phase0;
@@ -116,22 +147,20 @@ void accumulate(//hls::stream<bool> &stop, hls::stream<group_t> &groupin,
 			acc_t tmp;
 			inc.range()=tonesgroup.range(N_TONEBITS*(i+1)-1, N_TONEBITS*i);
 			phase0.range()=tonesgroup.range(N_P0BITS*(i+1)-1+N_TONEBITS*N_RES_PCLK,N_P0BITS*i+N_TONEBITS*N_RES_PCLK);
-			tmp.range()=acc.range(NBITS*(i+1)-1, NBITS*i);
+			tmp.range()=_acc.range(NBITS*(i+1)-1, NBITS*i);
 			_accv.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+phase0).range();
 			_acc.range(NBITS*(i+1)-1, NBITS*i) = acc_t(tmp+inc).range();
 		}
 
-		accumulator[group]=_acc;
+		acc=_acc;
 		accv.write(_accv);
-//		groupout.write(group);
-//		done.write(false);
-	}
-	}
-//	done.write(true);
+		groupout.write(group);
+
 }
 
 
-void ddsddc(//hls::stream<bool> &done, hls::stream<group_t> &groupin,
+void ddsddc(//hls::stream<bool> &done,
+		hls::stream<group_t> &groupin,
 		hls::stream<accgroup_t> &accgs, hls::stream<iqgroup_uint_t> &in,
 		hls::stream<loopcenter_group_t> &centergroup,
 		hls::stream<axisdata_t> &res_out) {
@@ -140,17 +169,17 @@ void ddsddc(//hls::stream<bool> &done, hls::stream<group_t> &groupin,
 
 
 //	ddsrun: while (!done.read()) {
-	ddssamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
-//#pragma HLS PIPELINE II=n_res_group REWIND
-	ddsrun: for (int group=0;group<N_RES_GROUPS;group++) {
-#pragma HLS PIPELINE II=1 REWIND
+//	ddssamp: for (int _samp=0;_samp<N_CYCLES;_samp++) {
+////#pragma HLS PIPELINE II=n_res_group REWIND
+//	ddsrun: for (int group=0;group<N_RES_GROUPS;group++) {
+#pragma HLS PIPELINE II=1
 		iqgroup_uint_t inv, _out;
 		accgroup_t accg;
 		loopcenter_group_t centergroupv;
 		axisdata_t data_out;
 
-//		group_t group;
-//		groupin.read(group);
+		group_t group;
+		groupin.read(group);
 		accgs.read(accg);
 		centergroup.read(centergroupv);
 		in.read(inv);
@@ -179,8 +208,7 @@ void ddsddc(//hls::stream<bool> &done, hls::stream<group_t> &groupin,
 		data_out.last = group == N_RES_GROUPS-1;
 		data_out.user = group;
 		res_out.write(data_out);
-	}
-	}
+
 }
 
 
@@ -192,6 +220,7 @@ void resonator_ddc(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_in
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_out
 
+	fetchrun: for (int i=0;i<N_RES_GROUPS*N_CYCLES;i++) {
 #pragma HLS DATAFLOW
 
 
@@ -211,17 +240,14 @@ void resonator_ddc(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res
 #pragma HLS STREAM variable=accg depth=3
 
 
-	//Fetch incoming values and data from bram
-	memory_fetcher(res_in, centers, tones, iq, centergroup, tonegroup);
-		//, group, done);
+		//Fetch incoming values and data from BRAM
+		mfetcher(res_in, centers, tones, iq, centergroup, tonegroup, group);
 
-	//Compute phase value
-	accumulate(//done, group,
-			tonegroup, accg);
-			//, group2, done2);
+		//Compute phase value
+		accumulate(group, tonegroup, accg, group2);//, done2);
 
-	//Compute DDS from phase accumulator, DDC, and center
-	ddsddc(//done2, group2,
-			accg, iq, centergroup, res_out);
+		//Compute DDS from phase accumulator, DDC, and center
+		ddsddc(group2, accg, iq, centergroup, res_out);
+	}
 
 }
