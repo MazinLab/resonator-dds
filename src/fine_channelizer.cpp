@@ -11,10 +11,10 @@ void dds(dds_words_t dds, dds_complex_t &ddsv) {
 //#pragma HLS INTERFACE mode=ap_ctrl_none port=return
 #pragma HLS INLINE
 	dds_t i,r;
-#pragma HLS BIND_OP variable=i op=add
-#pragma HLS BIND_OP variable=i op=sub
-#pragma HLS BIND_OP variable=r op=add
-#pragma HLS BIND_OP variable=r op=sub
+//#pragma HLS BIND_OP variable=i op=add
+//#pragma HLS BIND_OP variable=i op=sub
+//#pragma HLS BIND_OP variable=r op=add
+//#pragma HLS BIND_OP variable=r op=sub
 	r=dds.cos_word - dds.sin_word * dds.fine_word;
 	i=dds.sin_word + dds.cos_word * dds.fine_word;
 	ddsv.real(r);
@@ -45,10 +45,10 @@ void cmpysub(sample_complex_t iq, sample_complex_t center, dds_complex_t dds, sa
 #pragma HLS INLINE
 
 	sampleout_t r,i;
-#pragma HLS BIND_OP variable=i op=add
-#pragma HLS BIND_OP variable=i op=sub
-#pragma HLS BIND_OP variable=r op=add
-#pragma HLS BIND_OP variable=r op=sub
+//#pragma HLS BIND_OP variable=i op=add
+//#pragma HLS BIND_OP variable=i op=sub
+//#pragma HLS BIND_OP variable=r op=add
+//#pragma HLS BIND_OP variable=r op=sub
 	ap_fixed<34, 2, AP_RND_CONV, AP_SAT_SYM> ac, ad;
 
 	ac=iq.real()*dds.real();
