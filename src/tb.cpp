@@ -5,45 +5,43 @@
 #include <fstream>
 using namespace std;
 
-#define TOL 6e-5 //1.99031e-005
+#define TOL 4e-4 //6e-5 //1.99031e-005
 //Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
 
 
-double tone_for(unsigned int chan) {
-	int x=N_RES_GROUPS*N_RES_PCLK/2;
-	float y=x/2.0;
-	//return the tone increment for a channel
-	return (chan%x) - y;
-}
 
 complex<double> center_for(unsigned int chan) {
-	return complex<double>(.003, -.007);
+	return complex<double>(sample_t(.003).to_double(), sample_t(-.007).to_double());
 }
 
 double amplitude_for(unsigned int chan) {
-	return 0.06;//1.5/sqrt(2);
+	return sample_t(0.06).to_double();//1.5/sqrt(2);
 }
 
 double phase0_for(unsigned int chan) {
-	return chan/(N_RES_GROUPS*N_RES_PCLK*1.0)*.5;//.13*chan-.5;
+	return phase_t(chan/(N_RES_GROUPS*N_RES_PCLK*1.0)*.5).to_double();//.13*chan-.5;
 }
 
 double toneinc_for(unsigned int chan) {  //Tones are center relative  ±1 MHZ 1 MHz will repeat every two samples e.g 1, 0, 1, 0, ....
-    return tone_for(chan)/1e6; //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
+	int x=N_RES_GROUPS*N_RES_PCLK/2;
+	float y=x/2.0;
+	//return the tone increment for a channel
+    return toneinc_t(((chan%x) - y)/1e6).to_double(); //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
 }
+
 
 complex<double> dds_for(unsigned int chan, unsigned int sample) {
     //Compute the sin cosine value for the time step
     double phase;
-    phase = -(tone_for(chan)/1e6*sample+phase0_for(chan))*M_PI;
-    return complex<double>(cos(phase), sin(phase));
+    phase = -phase_t(toneinc_for(chan)*sample+phase0_for(chan)).to_double()*M_PI;
+    return complex<double>((cos(phase)), (sin(phase)));
 }
 
 complex<double> iq_for(unsigned int chan, unsigned int sample) {
     /* Compute sinusoid value for channel at sample */
     double phase, amp;
     amp=amplitude_for(chan);
-    phase = (tone_for(chan)/1e6*sample+phase0_for(chan))*M_PI;
+    phase = phase_t(toneinc_for(chan)*sample+phase0_for(chan)).to_double()*M_PI;
 	return complex<double>(amp*cos(phase), amp*sin(phase));
 }
 
@@ -67,7 +65,7 @@ int main(){
 	loopcenter_group_t centergroups[N_RES_GROUPS];
 	bool fail=false;
 	bool mismatch=false;
-	double maxerror=0;
+	double maxerror=0, maxerror_i=0, maxerror_q=0;
 
 	/*
 	 * The tone and phase offsets used by the core are +/- 1 with wrapping
@@ -127,11 +125,10 @@ int main(){
 	hls::stream<loopcenter_group_t> centergroup;
 	while(!res_in_stream.empty())
 		isolated_accumulator(res_in_stream, centergroups, tones, res_out, accgs, centergroup);
-	isolated_ddsddc(res_out, accgs, centergroup, res_out_stream);
+	while(!res_out.empty())
+		isolated_ddsddc(res_out, accgs, centergroup, res_out_stream);
 
 	//Check results
-//	res_out_stream.read();
-//	res_out_stream.read();
 	resgroupout_t out;
     ofstream myfile;
   	myfile.open("result16_8_17.txt");
@@ -153,8 +150,6 @@ int main(){
 			}
 			out.last=tmpout.last;
 			out.user=tmpout.user;
-
-//			if (j!=33) continue;
 
 			//Check user and last
 			if (out.user!=j) {
@@ -181,25 +176,29 @@ int main(){
 				centerv=center_for(j*N_RES_PCLK+k);
 
 				ddcd = dds_val*bin_iq - centerv;
-
-				//Look for loss of bitwidth
-//				sample_complex_t rangetst;
-//				rangetst.real().range()=out.data[k].real().range();
-//				rangetst.imag().range()=out.data[k].imag().range();
-//				cout<<rangetst.real();
-
+//				dds_complex_t a,b,c;
+//				a.real(dds_val.real());
+//				a.imag(dds_val.imag());
+//				b.real(bin_iq.real());
+//				b.imag(bin_iq.imag());
+//				c.real(centerv.real());
+//				c.imag(centerv.imag());
 
 				//Compare
 				diff_i=out.data[k].real().to_double()-ddcd.real();
 				diff_q=out.data[k].imag().to_double()-ddcd.imag();
 
-				maxerror = max(max(abs(diff_i),abs(diff_q)), maxerror);
+				maxerror_i=max(abs(diff_i), maxerror_i);
+				maxerror_q=max(abs(diff_q), maxerror_q);
+				maxerror=max(maxerror_q,maxerror_i);
 
 				bool mismatch = abs(diff_i)>TOL || abs(diff_q)>TOL;
 
 				if (mismatch || k==1 && j==33) {
 					cout<<"Phase="<<phase<<" Mixing IQ*DDS - center:"<<endl;
 					cout<<bin_iq<<" * "<<dds_val<<" - "<<centerv<<" = "<<ddcd<<endl;
+//					cout<<a<<" * "<<b<<" - "<<c<<" = "<<a*b-c<<endl;
+
 //					cout<<" IQfp="<<sample_t(bin_iq.real())<<","<<sample_t(bin_iq.imag())<<endl;
 					cout<<" Core gives: "<<out.data[k]<<endl;
 					cout<<" Delta: ("<<diff_i<<","<<diff_q<<")"<<endl;
@@ -212,8 +211,9 @@ int main(){
 		}
 	}
 	myfile.close();
-	if (fail) cout <<"FAILED. Max error:"<<maxerror<<"\n";
-	else cout<<"PASS! Max error:"<<maxerror<<"\n";
+	if (fail) cout <<"FAILED.";
+	else cout<<"PASS!";
+	cout<<" Max error: "<<maxerror_i<<", "<<maxerror_q<<"\n";
 	return fail;
 
 }

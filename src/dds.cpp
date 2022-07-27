@@ -100,8 +100,6 @@ void phase_sincos_LUT(acc_t acc, dds_words_t &out) {
     tout.sin_word=sin_lut_word;
     tout.fine_word=fine_word;
     out=tout;
-//    out.real(cos_lut_word - sin_lut_word * fine_word);
-//    out.imag(sin_lut_word + cos_lut_word * fine_word);
 
 }
 
