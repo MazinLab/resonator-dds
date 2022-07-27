@@ -13,8 +13,8 @@
 
 #define N_CYCLES 10
 
-#define N_RES_GROUPS 8
-#define N_GROUP_BITS 3
+#define N_RES_GROUPS 256
+#define N_GROUP_BITS 8
 
 #define N_RES_PCLK 8
 #define N_TONEBITS 11
@@ -28,7 +28,7 @@ typedef ap_fixed<N_P0BITS, 1, AP_RND_CONV, AP_WRAP> phase_t; //-1-1 wrap
 typedef std::complex<sample_t> loopcenter_t;
 typedef ap_uint<256> loopcenter_group_t;
 typedef ap_uint<256> iqgroup_uint_t;
-
+typedef sample_t center_t;
 typedef std::complex<sample_t> sample_complex_t;
 typedef std::complex<sampleout_t> sampleout_complex_t;
 typedef lut_word_t dds_t;
@@ -59,4 +59,5 @@ void isolated_ddsddc(
 		hls::stream<accgroup_t> &accgs,
 		hls::stream<loopcenter_group_t> &centergroup,
 		hls::stream<axisdata_t> &res_out);
+void dds(dds_words_t dds, dds_complex_t &ddsv);
 #endif

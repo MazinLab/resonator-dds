@@ -5,9 +5,7 @@
 #include <fstream>
 using namespace std;
 
-#define TOL 4e-4 //6e-5 //1.99031e-005
-//Phase increments properly, when it reaches 1 it wraps from -1 e.g. 1.2 would be -0.8
-
+#define TOL 1.9e-5 //1.99031e-005
 
 
 complex<double> center_for(unsigned int chan) {
@@ -15,57 +13,89 @@ complex<double> center_for(unsigned int chan) {
 }
 
 double amplitude_for(unsigned int chan) {
-	return sample_t(0.06).to_double();//1.5/sqrt(2);
+	return sample_t(0.06).to_double();
 }
 
 double phase0_for(unsigned int chan) {
-	return phase_t(chan/(N_RES_GROUPS*N_RES_PCLK*1.0)*.5).to_double();//.13*chan-.5;
+	return phase_t(.85*(2.0*chan/(N_RES_GROUPS*N_RES_PCLK)-1)).to_double();
 }
 
 double toneinc_for(unsigned int chan) {  //Tones are center relative  ±1 MHZ 1 MHz will repeat every two samples e.g 1, 0, 1, 0, ....
-	int x=N_RES_GROUPS*N_RES_PCLK/2;
-	float y=x/2.0;
+
+	return toneinc_t(2.0*chan/(N_RES_GROUPS*N_RES_PCLK)-1.0).to_double();
 	//return the tone increment for a channel
-    return toneinc_t(((chan%x) - y)/1e6).to_double(); //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
+//	int x=N_RES_GROUPS*N_RES_PCLK/2;
+//	float y=x/2.0;
+//    return toneinc_t(((chan%x) - y)/1e6).to_double(); //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
 }
 
+double phasequant_for(unsigned int chan, unsigned int sample) {
+    //Compute the sin cosine value for the time step
+    return phase_t((phase_t(-toneinc_for(chan)*sample).to_double()+ -phase0_for(chan)));
+}
+
+complex<double> ddsquant_for(unsigned int chan, unsigned int sample) {
+    //Compute the sin cosine value for the time step
+    acc_t acc;
+    acc.range()=phase_t(phasequant_for(chan, sample)).range();
+	dds_words_t ddsv;
+	dds_complex_t dds_sincos;
+	phase_sincos_LUT_wstatic(acc, ddsv);
+	dds(ddsv, dds_sincos);
+    return complex<double>(dds_sincos.real().to_double(), dds_sincos.imag().to_double());
+}
 
 complex<double> dds_for(unsigned int chan, unsigned int sample) {
     //Compute the sin cosine value for the time step
     double phase;
-    phase = -phase_t(toneinc_for(chan)*sample+phase0_for(chan)).to_double()*M_PI;
-    return complex<double>((cos(phase)), (sin(phase)));
+    phase = -(toneinc_for(chan)*sample+phase0_for(chan))*M_PI;
+    return complex<double>(cos(phase), sin(phase));
+}
+
+complex<double> ddsquant_for(unsigned int chan, unsigned int sample, acc_t phase_values[N_CYCLES][N_RES_GROUPS*N_RES_PCLK]) {
+    //Compute the sin cosine value for the time step
+    acc_t acc=phase_values[sample][chan];
+	dds_words_t ddsv;
+	dds_complex_t dds_sincos;
+	phase_sincos_LUT_wstatic(acc, ddsv);
+	dds(ddsv, dds_sincos);
+    return complex<double>(dds_sincos.real().to_double(), dds_sincos.imag().to_double());
+}
+
+complex<double> dds_for(unsigned int chan, unsigned int sample, acc_t phase_values[N_CYCLES][N_RES_GROUPS*N_RES_PCLK]) {
+    //Compute the sin cosine value for the time step
+    double phase=phase_values[sample][chan].to_double()*M_PI;
+    return complex<double>(cos(phase), sin(phase));
 }
 
 complex<double> iq_for(unsigned int chan, unsigned int sample) {
     /* Compute sinusoid value for channel at sample */
     double phase, amp;
     amp=amplitude_for(chan);
-    phase = phase_t(toneinc_for(chan)*sample+phase0_for(chan)).to_double()*M_PI;
+    phase=(toneinc_for(chan)*sample+phase0_for(chan))*M_PI;
 	return complex<double>(amp*cos(phase), amp*sin(phase));
 }
 
-complex<sample_t> quant_iq_for(unsigned int chan, unsigned int sample) {
+complex<double> iqquant_for(unsigned int chan, unsigned int sample) {
 
     complex<double> iq;
     complex<sample_t> out;
     iq=iq_for(chan, sample);
     out.real(iq.real());
     out.imag(iq.imag());
-    return out;
+    return complex<double>(out.real().to_double(), out.imag().to_double());
 
 }
 
 int main(){
 
-	toneinc_t toneinc[N_RES_GROUPS][N_RES_PCLK];
-	phase_t phase0[N_RES_GROUPS][N_RES_PCLK];
 	tonegroup_t tones[N_RES_GROUPS];
-	loopcenter_t centers[N_RES_GROUPS][N_RES_PCLK];
+	acc_t phase_values[N_CYCLES][N_RES_GROUPS*N_RES_PCLK];
 	loopcenter_group_t centergroups[N_RES_GROUPS];
 	bool fail=false;
 	bool mismatch=false;
-	double maxerror=0, maxerror_i=0, maxerror_q=0;
+	double maxerror=0, maxerror_i=0, maxerror_q=0, maxerror_p=0;
+	double maxqerror=0, maxqerror_i=0, maxqerror_q=0;
 
 	/*
 	 * The tone and phase offsets used by the core are +/- 1 with wrapping
@@ -78,24 +108,18 @@ int main(){
 	 * will be
 	 */
 
-	double PHASE0 = .24;  //initial phase
-
-
 	//Load in tone-bin center offsets and bin IQ values
 	for (int i=0; i<N_RES_GROUPS*N_RES_PCLK; i++){
-        int group, lane;
-		group=i/N_RES_PCLK;
+        int lane, group;
 		lane=i%N_RES_PCLK;
-		toneinc[group][lane] = toneinc_t(-toneinc_for(i));
-		phase0[group][lane] = phase_t(-phase0_for(i));
-		centers[group][lane] = center_for(i);
-		tones[group].range(N_TONEBITS*(lane+1)-1, N_TONEBITS*lane)=toneinc[group][lane].range();
-		tones[group].range(N_P0BITS*(lane+1)-1+N_TONEBITS*N_RES_PCLK, N_P0BITS*lane+N_TONEBITS*N_RES_PCLK)=phase0[group][lane].range();
-		centergroups[group].range(32*(lane+1)-16-1, 32*lane)=centers[group][lane].real().range();
-		centergroups[group].range(32*(lane+1)-1, 32*lane+16)=centers[group][lane].imag().range();
+		group=i/N_RES_PCLK;
+		tones[group].range(N_TONEBITS*(lane+1)-1, N_TONEBITS*lane)=toneinc_t(-toneinc_for(i)).range();
+		tones[group].range(N_P0BITS*(lane+1)-1+N_TONEBITS*N_RES_PCLK, N_P0BITS*lane+N_TONEBITS*N_RES_PCLK)=phase_t(-phase0_for(i)).range();
+
+		complex<double> c=center_for(i);
+		centergroups[group].range(32*(lane+1)-16-1, 32*lane)=center_t(c.real()).range();
+		centergroups[group].range(32*(lane+1)-1, 32*lane+16)=center_t(c.imag()).range();
 	}
-
-
 
 	//Run the DDS
 	hls::stream<axisdata_t> res_in_stream, res_out_stream;
@@ -104,15 +128,14 @@ int main(){
 		//Run the DDS on the data
 		for (int j=0;j<N_RES_GROUPS;j++){
 			axisdata_t in;
-			in.last = j==N_RES_GROUPS-1;
-			in.user=j;
 
 			for (int lane=0;lane<N_RES_PCLK;lane++){
-				complex<sample_t> iqquant;
-                iqquant=quant_iq_for(j*N_RES_PCLK+lane, i);
-				in.data.range(32*(lane+1)-1-16, 32*lane)=iqquant.real().range();
-				in.data.range(32*(lane+1)-1, 32*lane+16)=iqquant.imag().range();
+				complex<double> iqquant=iqquant_for(j*N_RES_PCLK+lane, i);
+				in.data.range(32*(lane+1)-1-16, 32*lane)=sample_t(iqquant.real()).range();
+				in.data.range(32*(lane+1)-1, 32*lane+16)=sample_t(iqquant.imag()).range();
 			}
+			in.last=j==(N_RES_GROUPS-1);
+			in.user=j;
 			res_in_stream.write(in);
 		}
 	}
@@ -121,20 +144,44 @@ int main(){
 
 
 	hls::stream<axisdata_t> res_out;
-	hls::stream<accgroup_t> accgs;
+	hls::stream<accgroup_t> accgs, accgs2;
 	hls::stream<loopcenter_group_t> centergroup;
+
+	//Run phase accumulator
 	while(!res_in_stream.empty())
 		isolated_accumulator(res_in_stream, centergroups, tones, res_out, accgs, centergroup);
+
+	//Cache core phase accumulator values for testing ddsddc in isolation
+	if (accgs.size()!=(N_RES_GROUPS*N_CYCLES)) {
+		cout<<"wrong amount of data!!!"<<endl;
+		return 1;
+	}
+	int i=0;
+	while (!accgs.empty()) {
+		accgroup_t tmp=accgs.read();
+		accgs2.write(tmp);
+        int sample, group;
+        sample=i/N_RES_GROUPS;
+		group=i%N_RES_GROUPS;
+		for (int lane=0;lane<N_RES_PCLK;lane++){
+			phase_values[sample][group*N_RES_PCLK+lane].range()=tmp.range(NBITS*(lane+1)-1, NBITS*lane);
+		}
+		i++;
+	}
+
+	//Run ddsddc
 	while(!res_out.empty())
-		isolated_ddsddc(res_out, accgs, centergroup, res_out_stream);
+		isolated_ddsddc(res_out, accgs2, centergroup, res_out_stream);
 
 	//Check results
 	resgroupout_t out;
     ofstream myfile;
   	myfile.open("result16_8_17.txt");
+
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
 		cout<<"Cycle "<<i<<endl;
 		myfile<<"#Cycle "<<i<<endl;
+
 		for (int j=0;j<N_RES_GROUPS;j++) { //takes N_RES_GROUPS cycles to get through each resonator once
 
 			if (res_out_stream.empty()){
@@ -163,26 +210,20 @@ int main(){
 
 			//Compare the result
 			for (int k=0;k<N_RES_PCLK;k++) {
-				complex<double> dds_val, bin_iq, ddcd, centerv;
-				complex<sample_t> bin_iq_fix;
-				double phase, inc, diff_i, diff_q; //0-1, increments by the tone increment each cycle
+				complex<double> dds_val, bin_iq, ddcd, ddcdq, centerv, dds_val_fix, bin_iq_fix;
+				double phase, inc, diff_i, diff_q, diffq_i, diffq_q; //0-1, increments by the tone increment each cycle
+				acc_t phasev=phase_values[i][j*N_RES_PCLK+k];
 
-				//Compute the sin cosine value for the time step
-				int tone_id=(j*N_RES_PCLK+k)%128-64;
-
-                dds_val = dds_for(j*N_RES_PCLK+k, i);
-                bin_iq_fix = quant_iq_for(j*N_RES_PCLK+k, i);
+				inc=toneinc_for(j*N_RES_PCLK+k);
+				phase = phasequant_for(j*N_RES_PCLK+k, i);
+                dds_val = dds_for(j*N_RES_PCLK+k, i, phase_values);
                 bin_iq=iq_for(j*N_RES_PCLK+k, i);
+                dds_val_fix = ddsquant_for(j*N_RES_PCLK+k, i, phase_values);
+                bin_iq_fix = iqquant_for(j*N_RES_PCLK+k, i);
 				centerv=center_for(j*N_RES_PCLK+k);
 
 				ddcd = dds_val*bin_iq - centerv;
-//				dds_complex_t a,b,c;
-//				a.real(dds_val.real());
-//				a.imag(dds_val.imag());
-//				b.real(bin_iq.real());
-//				b.imag(bin_iq.imag());
-//				c.real(centerv.real());
-//				c.imag(centerv.imag());
+				ddcdq = dds_val_fix*bin_iq_fix - centerv;
 
 				//Compare
 				diff_i=out.data[k].real().to_double()-ddcd.real();
@@ -192,28 +233,39 @@ int main(){
 				maxerror_q=max(abs(diff_q), maxerror_q);
 				maxerror=max(maxerror_q,maxerror_i);
 
-				bool mismatch = abs(diff_i)>TOL || abs(diff_q)>TOL;
+				diffq_i=out.data[k].real().to_double()-ddcdq.real();
+				diffq_q=out.data[k].imag().to_double()-ddcdq.imag();
+
+				maxqerror_i=max(abs(diffq_i), maxqerror_i);
+				maxqerror_q=max(abs(diffq_q), maxqerror_q);
+				maxqerror=max(maxqerror_q,maxqerror_i);
+
+				maxerror_p=max(maxerror_p, abs(phase-phasev.to_double()));
+
+				bool mismatch = max(abs(diffq_i),abs(diffq_q))>TOL;
 
 				if (mismatch || k==1 && j==33) {
-					cout<<"Phase="<<phase<<" Mixing IQ*DDS - center:"<<endl;
-					cout<<bin_iq<<" * "<<dds_val<<" - "<<centerv<<" = "<<ddcd<<endl;
-//					cout<<a<<" * "<<b<<" - "<<c<<" = "<<a*b-c<<endl;
-
-//					cout<<" IQfp="<<sample_t(bin_iq.real())<<","<<sample_t(bin_iq.imag())<<endl;
-					cout<<" Core gives: "<<out.data[k]<<endl;
-					cout<<" Delta: ("<<diff_i<<","<<diff_q<<")"<<endl;
+					cout<<"Phase: "<<phase<<" got: "<<phasev<<" Delta: "<<phase-phasev.to_double()<<endl;
+					cout<<"Mixing IQ*DDS - center:"<<endl;
+					cout<<"Float: "<<bin_iq<<" * "<<dds_val<<" - "<<centerv<<" = "<<ddcd<<endl;
+					cout<<"Fixed: "<<bin_iq_fix<<" * "<<dds_val_fix<<" - "<<centerv<<" = "<<ddcdq<<endl;
+					cout<<"Core: "<<out.data[k]<<endl;
+					cout<<"Delta (float): ("<<diff_i<<","<<diff_q<<")"<<endl;
+					cout<<"Delta (fixed): ("<<diffq_i<<","<<diffq_q<<")"<<endl;
 					if (mismatch) cout<<endl<<"MISMATCH: cycle="<<i<<" group="<<j<<" res="<<k<<endl<<endl;
 				}
 				fail|=mismatch;
 
-				myfile<<j*N_RES_PCLK+k<<", "<<setprecision(numeric_limits<double>::digits10 + 1)<<inc<<", "<<bin_iq<<","<<dds_val<<","<<ddcd<<","<<out.data[k]<<endl;
+				myfile<<j*N_RES_PCLK+k<<", "<<setprecision(numeric_limits<double>::digits10 + 1)<<inc<<", "<<bin_iq<<","<<phasev<<","<<dds_val<<","<<ddcd<<","<<out.data[k]<<endl;
 			}
 		}
 	}
 	myfile.close();
 	if (fail) cout <<"FAILED.";
 	else cout<<"PASS!";
-	cout<<" Max error: "<<maxerror_i<<", "<<maxerror_q<<"\n";
+	cout<<endl<<" Max error phase: "<<maxerror_p<<endl;
+	cout<<" Max error float: "<<maxerror_i<<", "<<maxerror_q<<"\n";
+	cout<<" Max error fixed: "<<maxqerror_i<<", "<<maxqerror_q<<"\n";
 	return fail;
 
 }
