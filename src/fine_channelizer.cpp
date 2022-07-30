@@ -101,6 +101,46 @@ void isolated_accumulator(hls::stream<axisdata_t> &res_in, loopcenter_group_t ce
 }
 
 
+
+void isolated_center(hls::stream<axisdata_t> &res_in, loopcenter_group_t centergroups[N_RES_GROUPS],  hls::stream<axisdata_t> &res_out) {
+#pragma HLS INTERFACE mode=axis register_mode=off port=res_in
+#pragma HLS INTERFACE mode=axis register_mode=off port=res_out
+#pragma HLS INTERFACE ap_ctrl_none port=return
+#pragma HLS INTERFACE s_axilite port=centergroups
+#pragma HLS PIPELINE II=1
+	axisdata_t data_in;
+	iqgroup_uint_t _out;
+	res_in.read(data_in);
+
+	group_t group;
+	group=data_in.user;
+
+	loopcenter_group_t centergroupv;
+	centergroupv = centergroups[group];
+
+	incp: for (int i=0; i<N_RES_PCLK; i++) {
+		sampleout_complex_t iqout;
+		sample_complex_t iq;
+		loopcenter_t center;
+		iq.real().range()=data_in.data.range(32*(i+1)-16-1, 32*i);
+		iq.imag().range()=data_in.data.range(32*(i+1)-1, 32*i+16);
+
+		center.real().range()=centergroupv.range(32*(i+1)-16-1, 32*i);
+		center.imag().range()=centergroupv.range(32*(i+1)-1, 32*i+16);
+
+		iqout.real(iq.real()-center.real());
+		iqout.imag(iq.real()-center.imag());
+
+		_out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
+		_out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
+	}
+
+	data_in.data=_out;
+	res_out.write(data_in);
+
+}
+
+
 void isolated_ddsddc(hls::stream<axisdata_t> &res_in, hls::stream<accgroup_t> &accgs, hls::stream<loopcenter_group_t> &centergroup,
 		hls::stream<axisdata_t> &res_out) {
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_in
