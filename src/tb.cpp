@@ -9,7 +9,7 @@ using namespace std;
 
 
 complex<double> center_for(unsigned int chan) {
-	return complex<double>(sample_t(.003).to_double(), sample_t(-.007).to_double());
+	return complex<double>(sample_t(1.50*chan/(N_RES_GROUPS*N_RES_PCLK)-1).to_double(), sample_t(-1.5*chan/(N_RES_GROUPS*N_RES_PCLK)-1).to_double());
 }
 
 double amplitude_for(unsigned int chan) {
@@ -222,19 +222,19 @@ int main(){
                 bin_iq_fix = iqquant_for(j*N_RES_PCLK+k, i);
 				centerv=center_for(j*N_RES_PCLK+k);
 
-				ddcd = dds_val*bin_iq - centerv;
-				ddcdq = dds_val_fix*bin_iq_fix - centerv;
+				ddcd = (dds_val*bin_iq) - centerv;
+				ddcdq = (dds_val_fix*bin_iq_fix) - centerv;
 
 				//Compare
-				diff_i=out.data[k].real().to_double()-ddcd.real();
-				diff_q=out.data[k].imag().to_double()-ddcd.imag();
+				diff_i=out.data[k].real().to_double()-sampleout_t(ddcd.real()).to_double();
+				diff_q=out.data[k].imag().to_double()-sampleout_t(ddcd.imag()).to_double();
 
 				maxerror_i=max(abs(diff_i), maxerror_i);
 				maxerror_q=max(abs(diff_q), maxerror_q);
 				maxerror=max(maxerror_q,maxerror_i);
 
-				diffq_i=out.data[k].real().to_double()-ddcdq.real();
-				diffq_q=out.data[k].imag().to_double()-ddcdq.imag();
+				diffq_i=out.data[k].real().to_double()-sampleout_t(ddcdq.real()).to_double();
+				diffq_q=out.data[k].imag().to_double()-sampleout_t(ddcdq.imag()).to_double();
 
 				maxqerror_i=max(abs(diffq_i), maxqerror_i);
 				maxqerror_q=max(abs(diffq_q), maxqerror_q);
