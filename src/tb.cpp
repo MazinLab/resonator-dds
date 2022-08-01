@@ -119,6 +119,7 @@ int main(){
 
 	//Run the DDS
 	hls::stream<axisdata_t> res_in_stream, res_out_stream;
+	hls::stream<accgroup_t> phase_out;
 
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
 		//Run the DDS on the data
@@ -136,7 +137,7 @@ int main(){
 		}
 	}
 
-	resonator_ddc(res_in_stream, res_out_stream, tones, centergroups);
+	resonator_ddc(res_in_stream, res_out_stream, tones, centergroups, phase_out);
 
 
 	//Check results
@@ -164,6 +165,11 @@ int main(){
 			out.last=tmpout.last;
 			out.user=tmpout.user;
 
+
+			accgroup_t tmpaccg=phase_out.read();
+			acc_t phasev[N_RES_PCLK];
+			for (int ii=0;ii<N_RES_PCLK;ii++) phasev[ii].range()=tmpaccg.range(NBITS*(ii+1)-1, NBITS*ii);
+
 			//Check user and last
 			if (out.user!=j) {
 				cout<<"User Mismatch at "<<i<<","<<j<<": "<<j<<"!="<<out.user<<endl;
@@ -178,7 +184,6 @@ int main(){
 			for (int k=0;k<N_RES_PCLK;k++) {
 				complex<double> dds_val, bin_iq, ddcd, ddcdq, centerv, dds_val_fix, bin_iq_fix;
 				double phase, inc, diff_i, diff_q, diffq_i, diffq_q; //0-1, increments by the tone increment each cycle
-
 
 				inc=toneinc_for(j*N_RES_PCLK+k);
 				phase = phasequant_for(j*N_RES_PCLK+k, i);
@@ -220,7 +225,7 @@ int main(){
 				}
 				fail|=mismatch;
 
-				myfile<<j*N_RES_PCLK+k<<", "<<setprecision(numeric_limits<double>::digits10 + 1)<<inc<<", "<<bin_iq<<","<<dds_val<<","<<ddcd<<","<<out.data[k]<<endl;
+				myfile<<j*N_RES_PCLK+k<<":"<<i<<":"<<setprecision(numeric_limits<double>::digits10 + 1)<<inc<<":"<<phase0_for(k+j*N_RES_PCLK)<<":"<<phase<<":"<<phasev[k].to_double()<<":"<<bin_iq<<":"<<dds_val<<":"<<centerv<<":"<<ddcd<<":"<<out.data[k]<<endl;
 			}
 		}
 	}
