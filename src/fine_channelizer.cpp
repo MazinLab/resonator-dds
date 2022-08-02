@@ -61,11 +61,10 @@ void isolated_accumulator(hls::stream<axisdata_t> &res_in, loopcenter_group_t ce
 	group=data_in.user;
 	lgroup=group-1;
 
-	centergroup.write(centergroups[group]);
 
 	tonegroup_t tonesgroup;
 	tonesgroup = tones[group];
-	res_out.write(data_in);
+
 
 	accgroup_t _accg,_phaseacc;
 
@@ -85,6 +84,10 @@ void isolated_accumulator(hls::stream<axisdata_t> &res_in, loopcenter_group_t ce
 		_accg.range(NBITS*(i+1)-1, NBITS*i) = phase_t(tmp+inc).range();
 	}
 
+	centergroup.write(centergroups[group]);
+	res_out.write(data_in);
+	accout.write(_phaseacc);
+
 //	accg=_accg;
 
 	static ap_uint<2> rst;
@@ -95,8 +98,6 @@ void isolated_accumulator(hls::stream<axisdata_t> &res_in, loopcenter_group_t ce
 	else if (data_in.last) rst=rst>>1;
 
 	last_group=group;
-
-	accout.write(_phaseacc);
 
 }
 

@@ -140,8 +140,6 @@ int main(){
 		}
 	}
 
-//	resonator_ddc(res_in_stream, res_out_stream, tones, centergroups);
-
 
 	hls::stream<axisdata_t> res_out;
 	hls::stream<accgroup_t> accgs, accgs2;
