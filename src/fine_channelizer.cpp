@@ -17,20 +17,10 @@ void cmpysub(sample_complex_t iq, sample_complex_t center, dds_complex_t dds, sa
 #pragma HLS INLINE
 	p_product.real(iq.real()*dds.real()-iq.imag()*dds.imag()-center.real());
 	p_product.imag(iq.real()*dds.imag()+iq.imag()*dds.real()-center.imag());
-//#ifndef __SYNTHESIS__
-//	cout<<"-----\nIQ * DDS - Center = result"<<endl;
-//	cout<<iq<<" * "<<dds<<" - "<<center<<" = "<<p_product<<endl;
-//	cout<<"ac: "<<ac<<" bd: "<<iq.imag()*dds.imag()<<" r:"<<ac-iq.imag()*dds.imag()-center.real()<<endl;
-//
-//	cout<<"IQ: "<<iq.real().range().to_int()<<" DDS: "<<dds.real().range().to_int()<<" Ctr:"<<center.real().range().to_int()<<endl;
-//	cout<<"ac: "<<ac.range().to_int64()<<" bd: "<<(iq.imag()*dds.imag()).range().to_int64()<<" r: "<<r.range().to_int64()<<endl;
-//	cout<<"Result: "<<p_product.real().range().to_int()<<"\n-----"<<endl;
-//#endif
-
 }
 
 
-void _ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_complex_t &iqout) {
+void ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_complex_t &iqout) {
 #pragma HLS INLINE
 	sampleout_complex_t tmp;
 	dds_words_t ddsv;
@@ -41,34 +31,33 @@ void _ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_comp
 }
 
 
-void isolated_accumulator(hls::stream<axisdata_t> &res_in, loopcenter_group_t centergroups[N_RES_GROUPS], tonegroup_t tones[N_RES_GROUPS],
-		hls::stream<axisdata_t> &res_out, hls::stream<accgroup_t> &accout, hls::stream<loopcenter_group_t> &centergroup) {
+void resonator_ddc_control(hls::stream<axisdata_t> &res_in, tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS],
+		hls::stream<axisdata_t> &res_out, hls::stream<accgroup_t> &acc_out, hls::stream<loopcenter_group_t> &center_out, bool clear_accumulator) {
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_in
-#pragma HLS INTERFACE mode=axis register_mode=off port=accout
-#pragma HLS INTERFACE mode=axis register_mode=off port=centergroup
-#pragma HLS INTERFACE mode=axis register_mode=off port=res_out
+#pragma HLS INTERFACE mode=axis port=acc_out
+#pragma HLS INTERFACE mode=axis port=center_out
+#pragma HLS INTERFACE mode=axis port=res_out
 #pragma HLS INTERFACE ap_ctrl_none port=return
 #pragma HLS INTERFACE s_axilite port=tones
-#pragma HLS INTERFACE s_axilite port=centergroups
+#pragma HLS INTERFACE s_axilite port=centers
+#pragma HLS INTERFACE s_axilite port=clear_accumulator
 #pragma HLS PIPELINE II=1
 
 	static accgroup_t accumulator[N_RES_GROUPS], accg;
+	static bool clear=false;
 
 	axisdata_t data_in;
+	group_t group;
+	tonegroup_t tonesgroup;
+	accgroup_t _accg, _phaseacc;
+
 	res_in.read(data_in);
 
-	group_t group, lgroup;
 	group=data_in.user;
-	lgroup=group-1;
 
-
-	tonegroup_t tonesgroup;
 	tonesgroup = tones[group];
 
-
-	accgroup_t _accg,_phaseacc;
-
-	accumulator[lgroup]=accg;
+	accumulator[group_t(group-1)]=accg;
 	_accg=accumulator[group];
 
 	incp: for (int i=0; i<N_RES_PCLK; i++) {
@@ -84,109 +73,58 @@ void isolated_accumulator(hls::stream<axisdata_t> &res_in, loopcenter_group_t ce
 		_accg.range(NBITS*(i+1)-1, NBITS*i) = phase_t(tmp+inc).range();
 	}
 
-	centergroup.write(centergroups[group]);
+	center_out.write(centers[group]);
 	res_out.write(data_in);
-	accout.write(_phaseacc);
+	acc_out.write(_phaseacc);
 
-//	accg=_accg;
-
-	static ap_uint<2> rst;
-	static group_t last_group=N_RES_GROUPS-1;
-	accg = rst>0 ? accgroup_t(0): _accg;
-
-	if (last_group!=lgroup) rst=2;
-	else if (data_in.last) rst=rst>>1;
-
-	last_group=group;
+	accg = clear ? accgroup_t(0): _accg;
+	if (clear_accumulator)
+		clear=true;
+	else if (data_in.last)
+		clear=false;
 
 }
 
 
-
-void isolated_center(hls::stream<axisdata_t> &res_in, loopcenter_group_t centergroups[N_RES_GROUPS],  hls::stream<axisdata_t> &res_out) {
+void dds_ddc_center(hls::stream<axisdata_t> &res_in, hls::stream<accgroup_t> &accumulator, hls::stream<loopcenter_group_t> &center,
+		hls::stream<axisdata_t> &res_out) {
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_in
-#pragma HLS INTERFACE mode=axis register_mode=off port=res_out
-#pragma HLS INTERFACE ap_ctrl_none port=return
-#pragma HLS INTERFACE s_axilite port=centergroups
+#pragma HLS INTERFACE mode=axis register_mode=off port=accumulator
+#pragma HLS INTERFACE mode=axis register_mode=off port=center
+#pragma HLS INTERFACE mode=axis port=res_out register_mode=off
+#pragma HLS INTERFACE mode=ap_ctrl_none port=return
 #pragma HLS PIPELINE II=1
-	axisdata_t data_in;
 	iqgroup_uint_t _out;
-	res_in.read(data_in);
-
-	group_t group;
-	group=data_in.user;
-
+	accgroup_t accg;
 	loopcenter_group_t centergroupv;
-	centergroupv = centergroups[group];
+	axisdata_t data_out, data_in;
 
-	incp: for (int i=0; i<N_RES_PCLK; i++) {
+	res_in.read(data_in);
+	accumulator.read(accg);
+	center.read(centergroupv);
+
+	ddc: for (int i=0; i<N_RES_PCLK; i++) {
 		sampleout_complex_t iqout;
+		acc_t acc;
 		sample_complex_t iq;
-		loopcenter_t center;
+		loopcenter_t lcenter;
+
+		acc.range()=accg.range(NBITS*(i+1)-1, NBITS*i);
+
 		iq.real().range()=data_in.data.range(32*(i+1)-16-1, 32*i);
 		iq.imag().range()=data_in.data.range(32*(i+1)-1, 32*i+16);
 
-		center.real().range()=centergroupv.range(32*(i+1)-16-1, 32*i);
-		center.imag().range()=centergroupv.range(32*(i+1)-1, 32*i+16);
+		lcenter.real().range()=centergroupv.range(32*(i+1)-16-1, 32*i);
+		lcenter.imag().range()=centergroupv.range(32*(i+1)-1, 32*i+16);
 
-		iqout.real(iq.real()-center.real());
-		iqout.imag(iq.real()-center.imag());
+		ddsddc(acc, iq, lcenter, iqout);
 
 		_out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
 		_out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
 	}
 
-	data_in.data=_out;
-	res_out.write(data_in);
-
-}
-
-
-void isolated_ddsddc(hls::stream<axisdata_t> &res_in, hls::stream<accgroup_t> &accgs, hls::stream<loopcenter_group_t> &centergroup,
-		hls::stream<axisdata_t> &res_out) {
-#pragma HLS INTERFACE mode=axis register_mode=off port=res_in
-#pragma HLS INTERFACE mode=axis register_mode=off port=accgs
-#pragma HLS INTERFACE mode=axis register_mode=off port=centergroup
-#pragma HLS INTERFACE mode=axis register_mode=off port=res_out
-#pragma HLS INTERFACE mode=ap_ctrl_none port=return
-
-//	while (true){
-#pragma HLS PIPELINE II=1 REWIND
-		iqgroup_uint_t _out;
-		accgroup_t accg;
-		loopcenter_group_t centergroupv;
-		axisdata_t data_out, data_in;
-
-		res_in.read(data_in);
-//		if(!res_in.read_nb(data_in)) break;
-
-		accgs.read(accg);
-		centergroup.read(centergroupv);
-
-
-		ddc: for (int i=0; i<N_RES_PCLK; i++) {
-			sampleout_complex_t iqout;
-			acc_t acc;
-			sample_complex_t iq;
-			loopcenter_t center;
-
-			acc.range()=accg.range(NBITS*(i+1)-1, NBITS*i);
-
-			iq.real().range()=data_in.data.range(32*(i+1)-16-1, 32*i);
-			iq.imag().range()=data_in.data.range(32*(i+1)-1, 32*i+16);
-
-			center.real().range()=centergroupv.range(32*(i+1)-16-1, 32*i);
-			center.imag().range()=centergroupv.range(32*(i+1)-1, 32*i+16);
-
-			_ddsddc(acc, iq, center, iqout);
-
-			_out.range(32*(i+1)-16-1, 32*i)=iqout.real().range();
-			_out.range(32*(i+1)-1, 32*i+16)=iqout.imag().range();
-		}
-
-		data_out.data = _out;
-		data_out.last = data_in.last;
-		data_out.user = data_in.user;
-		res_out.write(data_out);
-	//}
+	data_out.data = _out;
+	data_out.last = data_in.last;
+	data_out.user = data_in.user;
+	res_out.write(data_out);
 }

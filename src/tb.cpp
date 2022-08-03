@@ -145,16 +145,56 @@ int main(){
 	hls::stream<accgroup_t> accgs, accgs2;
 	hls::stream<loopcenter_group_t> centergroup;
 
+
 	//Run phase accumulator
 	while(!res_in_stream.empty())
-		isolated_accumulator(res_in_stream, centergroups, tones, res_out, accgs, centergroup);
+		resonator_ddc_control(res_in_stream, tones, centergroups, res_out, accgs, centergroup, false);
+
+
+	//Verify phase accumulator resets properly
+	hls::stream<axisdata_t> dummy_in, dummy_out;
+	hls::stream<accgroup_t> reset_accgs;
+	hls::stream<loopcenter_group_t> dummy_center;
+	for (int i=0;i<N_RES_GROUPS; i++)
+		tones[i]=0;
+	for (int i=0; i<4;i++) {
+		for (int j=0;j<N_RES_GROUPS;j++){
+			axisdata_t in;
+			in.data=0;
+			in.last=j==(N_RES_GROUPS-1);
+			in.user=j;
+			dummy_in.write(in);
+		}
+	}
+	for (int i=0;i<N_RES_GROUPS+4; i++) //must be true for at least N_RES_GROUPS clocks
+		resonator_ddc_control(dummy_in, tones, centergroups, dummy_out, reset_accgs, dummy_center, i>3);
+	while(!dummy_in.empty())
+		resonator_ddc_control(dummy_in, tones, centergroups, dummy_out, reset_accgs, dummy_center, false);
+	// Check that reset_accgs is reset fully after second tlast
+
+	int i=0;
+	while (!dummy_out.empty()) {
+		axisdata_t d=dummy_out.read();
+		group_t g=d.user;
+		accgroup_t a=reset_accgs.read();
+		if (i<(N_RES_GROUPS+5)) {
+			if (a==0)
+				cout<<"phase zero too soon"<<i<<endl;
+		} else if (a!=0) {
+			fail=true;
+			cout<<"phase not zero after reset"<<i<<" "<<i%N_RES_GROUPS<<endl;
+		}
+
+		i++;
+	}
+
 
 	//Cache core phase accumulator values for testing ddsddc in isolation
 	if (accgs.size()!=(N_RES_GROUPS*N_CYCLES)) {
 		cout<<"wrong amount of data!!!"<<endl;
 		return 1;
 	}
-	int i=0;
+	i=0;
 	while (!accgs.empty()) {
 		accgroup_t tmp=accgs.read();
 		accgs2.write(tmp);
@@ -169,7 +209,7 @@ int main(){
 
 	//Run ddsddc
 	while(!res_out.empty())
-		isolated_ddsddc(res_out, accgs2, centergroup, res_out_stream);
+		dds_ddc_center(res_out, accgs2, centergroup, res_out_stream);
 
 	//Check results
 	resgroupout_t out;
