@@ -13,8 +13,8 @@
 
 #define N_CYCLES 10
 
-#define N_RES_GROUPS 8
-#define N_GROUP_BITS 3
+#define N_RES_GROUPS 256
+#define N_GROUP_BITS 8
 
 #define N_RES_PCLK 8
 #define N_TONEBITS 11
@@ -51,7 +51,9 @@ typedef ap_uint<(N_P0BITS+N_TONEBITS)*N_RES_PCLK> tonegroup_t;
 
 typedef ap_uint<NBITS*N_RES_PCLK> accgroup_t;
 
-void resonator_ddc(hls::stream<axisdata_t> &res_in, hls::stream<axisdata_t> &res_out,
-		tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS], hls::stream<accgroup_t> &phase_out);
+void resonator_ddc_control(hls::stream<axisdata_t> &res_in, tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS],
+		hls::stream<axisdata_t> &res_out, hls::stream<accgroup_t> &acc_out, hls::stream<loopcenter_group_t> &center_out, bool clear);
+void dds_ddc_center(hls::stream<axisdata_t> &res_in, hls::stream<accgroup_t> &accumulator, hls::stream<loopcenter_group_t> &center,
+		hls::stream<axisdata_t> &res_out);
 void dds(dds_words_t dds, dds_complex_t &ddsv);
 #endif

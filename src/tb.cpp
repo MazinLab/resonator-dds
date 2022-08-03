@@ -9,8 +9,7 @@ using namespace std;
 
 
 complex<double> center_for(unsigned int chan) {
-	return complex<double>(sample_t(1.5*chan/(N_RES_GROUPS*N_RES_PCLK)-.75).to_double(),
-						   sample_t(-1.5*chan/(N_RES_GROUPS*N_RES_PCLK)-.75).to_double());
+	return complex<double>(sample_t(1.50*chan/(N_RES_GROUPS*N_RES_PCLK)-1).to_double(), sample_t(-1.5*chan/(N_RES_GROUPS*N_RES_PCLK)-1).to_double());
 }
 
 double amplitude_for(unsigned int chan) {
@@ -18,16 +17,21 @@ double amplitude_for(unsigned int chan) {
 }
 
 double phase0_for(unsigned int chan) {
-	return phase_t(.85*(2.0*chan/(N_RES_GROUPS*N_RES_PCLK)-.85/2)).to_double();
+	return phase_t(.85*(2.0*chan/(N_RES_GROUPS*N_RES_PCLK)-1)).to_double();
 }
 
 double toneinc_for(unsigned int chan) {  //Tones are center relative  ±1 MHZ 1 MHz will repeat every two samples e.g 1, 0, 1, 0, ....
+
 	return toneinc_t(2.0*chan/(N_RES_GROUPS*N_RES_PCLK)-1.0).to_double();
+	//return the tone increment for a channel
+//	int x=N_RES_GROUPS*N_RES_PCLK/2;
+//	float y=x/2.0;
+//    return toneinc_t(((chan%x) - y)/1e6).to_double(); //1MHZ /1e6 = 1 -> equivalent to +pi, wrap every two
 }
 
 double phasequant_for(unsigned int chan, unsigned int sample) {
     //Compute the sin cosine value for the time step
-    return phase_t(phase_t(-toneinc_for(chan)*sample).to_double()+ -phase0_for(chan)).to_double();
+    return phase_t((phase_t(-toneinc_for(chan)*sample).to_double()+ -phase0_for(chan)));
 }
 
 complex<double> ddsquant_for(unsigned int chan, unsigned int sample) {
@@ -119,7 +123,6 @@ int main(){
 
 	//Run the DDS
 	hls::stream<axisdata_t> res_in_stream, res_out_stream;
-	hls::stream<accgroup_t> phase_out;
 
 	for (int i=0; i<N_CYCLES;i++) { // Go through more than once to see the phase increment
 		//Run the DDS on the data
@@ -137,8 +140,76 @@ int main(){
 		}
 	}
 
-	resonator_ddc(res_in_stream, res_out_stream, tones, centergroups, phase_out);
 
+	hls::stream<axisdata_t> res_out;
+	hls::stream<accgroup_t> accgs, accgs2;
+	hls::stream<loopcenter_group_t> centergroup;
+
+
+	//Run phase accumulator
+	while(!res_in_stream.empty())
+		resonator_ddc_control(res_in_stream, tones, centergroups, res_out, accgs, centergroup, false);
+
+
+	//Verify phase accumulator resets properly
+	hls::stream<axisdata_t> dummy_in, dummy_out;
+	hls::stream<accgroup_t> reset_accgs;
+	hls::stream<loopcenter_group_t> dummy_center;
+	for (int i=0;i<N_RES_GROUPS; i++)
+		tones[i]=0;
+	for (int i=0; i<4;i++) {
+		for (int j=0;j<N_RES_GROUPS;j++){
+			axisdata_t in;
+			in.data=0;
+			in.last=j==(N_RES_GROUPS-1);
+			in.user=j;
+			dummy_in.write(in);
+		}
+	}
+	for (int i=0;i<N_RES_GROUPS+4; i++) //must be true for at least N_RES_GROUPS clocks
+		resonator_ddc_control(dummy_in, tones, centergroups, dummy_out, reset_accgs, dummy_center, i>3);
+	while(!dummy_in.empty())
+		resonator_ddc_control(dummy_in, tones, centergroups, dummy_out, reset_accgs, dummy_center, false);
+	// Check that reset_accgs is reset fully after second tlast
+
+	int i=0;
+	while (!dummy_out.empty()) {
+		axisdata_t d=dummy_out.read();
+		group_t g=d.user;
+		accgroup_t a=reset_accgs.read();
+		if (i<(N_RES_GROUPS+5)) {
+			if (a==0)
+				cout<<"phase zero too soon"<<i<<endl;
+		} else if (a!=0) {
+			fail=true;
+			cout<<"phase not zero after reset"<<i<<" "<<i%N_RES_GROUPS<<endl;
+		}
+
+		i++;
+	}
+
+
+	//Cache core phase accumulator values for testing ddsddc in isolation
+	if (accgs.size()!=(N_RES_GROUPS*N_CYCLES)) {
+		cout<<"wrong amount of data!!!"<<endl;
+		return 1;
+	}
+	i=0;
+	while (!accgs.empty()) {
+		accgroup_t tmp=accgs.read();
+		accgs2.write(tmp);
+        int sample, group;
+        sample=i/N_RES_GROUPS;
+		group=i%N_RES_GROUPS;
+		for (int lane=0;lane<N_RES_PCLK;lane++){
+			phase_values[sample][group*N_RES_PCLK+lane].range()=tmp.range(NBITS*(lane+1)-1, NBITS*lane);
+		}
+		i++;
+	}
+
+	//Run ddsddc
+	while(!res_out.empty())
+		dds_ddc_center(res_out, accgs2, centergroup, res_out_stream);
 
 	//Check results
 	resgroupout_t out;
@@ -165,11 +236,6 @@ int main(){
 			out.last=tmpout.last;
 			out.user=tmpout.user;
 
-
-			accgroup_t tmpaccg=phase_out.read();
-			acc_t phasev[N_RES_PCLK];
-			for (int ii=0;ii<N_RES_PCLK;ii++) phasev[ii].range()=tmpaccg.range(NBITS*(ii+1)-1, NBITS*ii);
-
 			//Check user and last
 			if (out.user!=j) {
 				cout<<"User Mismatch at "<<i<<","<<j<<": "<<j<<"!="<<out.user<<endl;
@@ -184,12 +250,13 @@ int main(){
 			for (int k=0;k<N_RES_PCLK;k++) {
 				complex<double> dds_val, bin_iq, ddcd, ddcdq, centerv, dds_val_fix, bin_iq_fix;
 				double phase, inc, diff_i, diff_q, diffq_i, diffq_q; //0-1, increments by the tone increment each cycle
+				acc_t phasev=phase_values[i][j*N_RES_PCLK+k];
 
 				inc=toneinc_for(j*N_RES_PCLK+k);
 				phase = phasequant_for(j*N_RES_PCLK+k, i);
-                dds_val = dds_for(j*N_RES_PCLK+k, i);
+                dds_val = dds_for(j*N_RES_PCLK+k, i, phase_values);
                 bin_iq=iq_for(j*N_RES_PCLK+k, i);
-                dds_val_fix = ddsquant_for(j*N_RES_PCLK+k, i);
+                dds_val_fix = ddsquant_for(j*N_RES_PCLK+k, i, phase_values);
                 bin_iq_fix = iqquant_for(j*N_RES_PCLK+k, i);
 				centerv=center_for(j*N_RES_PCLK+k);
 
@@ -211,10 +278,12 @@ int main(){
 				maxqerror_q=max(abs(diffq_q), maxqerror_q);
 				maxqerror=max(maxqerror_q,maxqerror_i);
 
+				maxerror_p=max(maxerror_p, abs(phase-phasev.to_double()));
+
 				bool mismatch = max(abs(diffq_i),abs(diffq_q))>TOL;
 
 				if (mismatch || k==1 && j==33) {
-					cout<<"Phase: "<<phase<<endl;
+					cout<<"Phase: "<<phase<<" got: "<<phasev<<" Delta: "<<phase-phasev.to_double()<<endl;
 					cout<<"Mixing IQ*DDS - center:"<<endl;
 					cout<<"Float: "<<bin_iq<<" * "<<dds_val<<" - "<<centerv<<" = "<<ddcd<<endl;
 					cout<<"Fixed: "<<bin_iq_fix<<" * "<<dds_val_fix<<" - "<<centerv<<" = "<<ddcdq<<endl;
@@ -225,7 +294,7 @@ int main(){
 				}
 				fail|=mismatch;
 
-				myfile<<j*N_RES_PCLK+k<<":"<<i<<":"<<setprecision(numeric_limits<double>::digits10 + 1)<<inc<<":"<<phase0_for(k+j*N_RES_PCLK)<<":"<<phase<<":"<<phasev[k].to_double()<<":"<<bin_iq<<":"<<dds_val<<":"<<centerv<<":"<<ddcd<<":"<<out.data[k]<<endl;
+				myfile<<j*N_RES_PCLK+k<<", "<<setprecision(numeric_limits<double>::digits10 + 1)<<inc<<", "<<bin_iq<<","<<phasev<<","<<dds_val<<","<<ddcd<<","<<out.data[k]<<endl;
 			}
 		}
 	}
