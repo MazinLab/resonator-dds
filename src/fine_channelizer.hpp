@@ -60,7 +60,7 @@ typedef ap_axiu<SAMPLE_GROUP_BITS+ACC_GROUP_BITS+SAMPLE_GROUP_BITS,8,0,0> axisda
 
 
 void resonator_ddc_control(hls::stream<axisdata_t> &res_in, tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS],
-		hls::stream<axisdata_t> &res_out, hls::stream<accgroup_t> &acc_out, hls::stream<loopcenter_group_t> &center_out, bool clear);
+		hls::stream<axisdata_acc_center_combo_t> &out, bool clear_accumulator);
 void dds_ddc_center(hls::stream<axisdata_t> &res_in, hls::stream<accgroup_t> &accumulator, hls::stream<loopcenter_group_t> &center,
 		hls::stream<axisdata_t> &res_out);
 void dds(dds_words_t dds, dds_complex_t &ddsv);

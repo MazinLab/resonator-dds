@@ -78,8 +78,8 @@ void phase_sincos_LUT(acc_t acc, dds_words_t &out) {
          cos_adr      = -lsb;
          cos_lut_word =  cos_lut[cos_adr];
        }
-         sin_adr      =  lsb;
-         sin_lut_word = -cos_lut[sin_adr];
+       sin_adr      =  lsb;
+       sin_lut_word = -cos_lut[sin_adr];
 
     // left bot
     } else             {
@@ -98,6 +98,97 @@ void phase_sincos_LUT(acc_t acc, dds_words_t &out) {
     dds_words_t tout;
     tout.cos_word=cos_lut_word;
     tout.sin_word=sin_lut_word;
+    tout.fine_word=fine_word;
+    out=tout;
+
+}
+
+
+
+void phase_sincos_LUT_alwaysquery(acc_t acc, dds_words_t &out) {
+//#pragma HLS INLINE
+#pragma HLS INTERFACE mode=ap_ctrl_none port=return
+#pragma HLS AGGREGATE variable=out
+#pragma HLS PIPELINE II=1 style=frp
+
+	//Init LUTs
+	lut_word_t cos_lut[LUTSIZE];
+	fine_word_t fine_lut[FINESIZE];
+	init_cos_lut( cos_lut, LUTSIZE );
+	init_fine_lut( fine_lut, FINESIZE, DELTA );
+
+
+	fine_adr_t fine_adr;
+	fine_word_t fine_word;
+
+	lut_adr_t  full_adr;         // cover full quadrant
+	quad_adr_t lsb;              // cover 1/4 quadrant
+	quad_adr_t cos_adr, sin_adr;
+
+	ap_uint<2>  msb;             // specify which quadrant
+	lut_word_t  cos_lut_word;
+	lut_word_t  sin_lut_word;
+
+	// look up cos/sine table
+	full_adr = acc(NBITS-1, NBITS-NLUT-2);  //12 bits  21,10
+	fine_adr = acc(NBITS-NLUT-3, NBITS-NLUT-NFINE-2);  //9 bits  9, 0
+
+	msb      = full_adr(NLUT+1, NLUT); //2 bits
+	lsb      = full_adr(NLUT-1,0); //10 bits, quadrant ndx
+
+	bool sin0, cos0;
+
+    // right top
+    if (msb==0) {
+       sin0= lsb==0;
+       cos0=false;
+
+       cos_adr      = lsb;
+       sin_adr      = -lsb;
+
+       cos_lut_word = cos_lut[cos_adr];
+       sin_lut_word = cos_lut[sin_adr];
+
+    // left top
+    } else if (msb==1) {
+       cos0=lsb==0;
+       sin0=false;
+
+       cos_adr      = -lsb;
+       sin_adr      = lsb;
+
+       cos_lut_word = -cos_lut[cos_adr];
+       sin_lut_word =  cos_lut[sin_adr];
+
+    // right bot
+    } else if (msb==3) {
+
+       cos0=lsb==0;
+       sin0=false;
+
+   	   cos_adr      = -lsb;
+       sin_adr      =  lsb;
+
+       cos_lut_word =  cos_lut[cos_adr];
+       sin_lut_word = -cos_lut[sin_adr];
+
+    // left bot
+    } else             {
+       cos_adr      =  lsb;
+       sin_adr      = -lsb;
+
+       cos0=false;
+       sin0=lsb==0;
+
+       cos_lut_word = -cos_lut[cos_adr];
+	   sin_lut_word = -cos_lut[sin_adr];
+    }
+
+    fine_word = fine_lut[fine_adr];
+
+    dds_words_t tout;
+    tout.cos_word=cos0 ? lut_word_t(0): cos_lut_word;
+    tout.sin_word=sin0 ? lut_word_t(0): sin_lut_word;
     tout.fine_word=fine_word;
     out=tout;
 

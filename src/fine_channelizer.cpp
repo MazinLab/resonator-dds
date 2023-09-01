@@ -32,11 +32,9 @@ void ddsddc(acc_t acc, sample_complex_t iq, loopcenter_t center, sampleout_compl
 
 
 void resonator_ddc_control(hls::stream<axisdata_t> &res_in, tonegroup_t tones[N_RES_GROUPS], loopcenter_group_t centers[N_RES_GROUPS],
-		hls::stream<axisdata_t> &res_out, hls::stream<accgroup_t> &acc_out, hls::stream<loopcenter_group_t> &center_out, bool clear_accumulator) {
+		hls::stream<axisdata_acc_center_combo_t> &out, bool clear_accumulator) {
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_in
-#pragma HLS INTERFACE mode=axis port=acc_out
-#pragma HLS INTERFACE mode=axis port=center_out
-#pragma HLS INTERFACE mode=axis port=res_out
+#pragma HLS INTERFACE mode=axis port=out register_mode=both
 #pragma HLS INTERFACE ap_ctrl_none port=return
 #pragma HLS INTERFACE s_axilite port=tones
 #pragma HLS INTERFACE s_axilite port=centers
@@ -73,9 +71,14 @@ void resonator_ddc_control(hls::stream<axisdata_t> &res_in, tonegroup_t tones[N_
 		_accg.range(NBITS*(i+1)-1, NBITS*i) = phase_t(tmp+inc).range();
 	}
 
-	center_out.write(centers[group]);
-	res_out.write(data_in);
-	acc_out.write(_phaseacc);
+
+	axisdata_acc_center_combo_t _output;
+	_output.data.range(SAMPLE_GROUP_BITS-1,0)=data_in.data.range();
+	_output.data.range(ACC_GROUP_BITS+SAMPLE_GROUP_BITS-1, SAMPLE_GROUP_BITS)=_phaseacc.range();
+	_output.data.range(ACC_GROUP_BITS+SAMPLE_GROUP_BITS+SAMPLE_GROUP_BITS-1, ACC_GROUP_BITS+SAMPLE_GROUP_BITS)=centers[group].range();
+	_output.user=data_in.user;
+	_output.last=data_in.last;
+	out.write(_output);
 
 	accg = clear ? accgroup_t(0): _accg;
 	if (clear_accumulator)
@@ -88,18 +91,11 @@ void resonator_ddc_control(hls::stream<axisdata_t> &res_in, tonegroup_t tones[N_
 
 void resonator_ddc_control_mem(hls::stream<axisdata_t> &res_in, tones_and_centers_t tones_and_centers[N_RES_GROUPS],
 		hls::stream<axisdata_acc_center_combo_t> &out){
-//		hls::stream<axisdata_t> &res_out, hls::stream<accgroup_t> &acc_out, hls::stream<loopcenter_group_t> &center_out){
 bool clear_accumulator=false;
 #pragma HLS INTERFACE mode=bram port=tones_and_centers storage_type=ram_s2p latency=3
 #pragma HLS INTERFACE mode=axis register_mode=off port=res_in
 #pragma HLS INTERFACE mode=axis port=out register_mode=both
-//#pragma HLS INTERFACE mode=axis port=acc_out
-//#pragma HLS INTERFACE mode=axis port=center_out
-//#pragma HLS INTERFACE mode=axis port=res_out
 #pragma HLS INTERFACE ap_ctrl_none port=return
-//#pragma HLS INTERFACE s_axilite port=tones
-//#pragma HLS INTERFACE s_axilite port=centers
-//#pragma HLS INTERFACE s_axilite port=clear_accumulator
 #pragma HLS PIPELINE II=1
 
 	static accgroup_t accumulator[N_RES_GROUPS], accg;
@@ -137,9 +133,6 @@ bool clear_accumulator=false;
 		_accg.range(NBITS*(i+1)-1, NBITS*i) = phase_t(tmp+inc).range();
 	}
 
-//	center_out.write(centers);
-//	res_out.write(data_in);
-//	acc_out.write(_phaseacc);
 	axisdata_acc_center_combo_t _output;
 	_output.data.range(SAMPLE_GROUP_BITS-1,0)=data_in.data.range();
 	_output.data.range(ACC_GROUP_BITS+SAMPLE_GROUP_BITS-1, SAMPLE_GROUP_BITS)=_phaseacc.range();
@@ -157,12 +150,8 @@ bool clear_accumulator=false;
 }
 
 void dds_ddc_center(hls::stream<axisdata_acc_center_combo_t> &ddc_control_out,
-		//hls::stream<axisdata_t> &res_in, hls::stream<accgroup_t> &accumulator, hls::stream<loopcenter_group_t> &center,
 		hls::stream<axisdata_t> &res_out) {
 #pragma HLS INTERFACE mode=axis register_mode=both port=ddc_control_out
-//#pragma HLS INTERFACE mode=axis register_mode=off port=res_in
-//#pragma HLS INTERFACE mode=axis register_mode=off port=accumulator
-//#pragma HLS INTERFACE mode=axis register_mode=off port=center
 #pragma HLS INTERFACE mode=axis port=res_out //register_mode=off
 #pragma HLS INTERFACE mode=ap_ctrl_none port=return
 #pragma HLS PIPELINE II=1
@@ -178,9 +167,6 @@ void dds_ddc_center(hls::stream<axisdata_acc_center_combo_t> &ddc_control_out,
 	data_in.last=_input.last;
 	accg.range()=_input.data.range(ACC_GROUP_BITS+SAMPLE_GROUP_BITS-1, SAMPLE_GROUP_BITS);
 	centergroupv.range()=_input.data.range(ACC_GROUP_BITS+SAMPLE_GROUP_BITS+SAMPLE_GROUP_BITS-1, ACC_GROUP_BITS+SAMPLE_GROUP_BITS);
-//	res_in.read(data_in);
-//	accumulator.read(accg);
-//	center.read(centergroupv);
 
 	ddc: for (int i=0; i<N_RES_PCLK; i++) {
 		sampleout_complex_t iqout;

@@ -41,6 +41,7 @@ typedef struct {
 
 void phase_sincos_LUT(acc_t acc, dds_words_t &out);
 void phase_sincos_LUT_wstatic(acc_t acc, dds_words_t &out);
+void phase_sincos_LUT_alwaysquery(acc_t acc, dds_words_t &out);
 #endif
 
 /************************************************
