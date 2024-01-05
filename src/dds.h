@@ -1,10 +1,5 @@
 #ifndef DDS_H_
 #define DDS_H_
-
-#include <iostream>
-#include <fstream>
-using namespace std;
-
 #include "ap_fixed.h"
 #include "hls_math.h"
 
@@ -12,42 +7,41 @@ using namespace std;
 // phase accumulator 
 #define NBITS 21  //must be no less than NLUT+NFINE+2
 
-
 //typedef ap_fixed<NBITS,1> incr_t;  // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
 typedef ap_fixed<NBITS,1> acc_t;   // s.xxxx, +/- 1 = +/- pi = +fs/2 to -fs/2
-
-typedef ap_fixed<16,1,AP_RND_CONV,AP_SAT_SYM> dds_t;
-
-typedef struct {
-	dds_t i;
-	dds_t q;
-} ddsiq_t;
-typedef ap_uint<32> ddsiq32_t;
 
 
 //NB cos table bits is LUTSIZE*17 so up to 1024 will be only one bram and the fine table is similar
 // so we dont save by going smaller
+
 // cos lut address, word size
 const int NLUT     = 10;               // bitwidth for cos lut address, covers one quadrant
 const int LUTSIZE  = 1024;             // 2^NLUT
+
 // fine lut address, word size
 const int NFINE     = 9;               // bitwidth for fine lut address, covers one quadrant
 const int FINESIZE  = 512;             // 2^NFINE
 
+const double DELTA = M_PI/(2*LUTSIZE*FINESIZE); // fine lut resolution, range covers 0 to pi/(2*LUTSIZE)
 
 typedef ap_uint<NLUT+2> lut_adr_t;     // covers 4 quadrant
 typedef ap_uint<NLUT>   quad_adr_t;    // covers 1 quadrant
-typedef ap_uint<NFINE> fine_adr_t;    // covers 4 quadrant
+typedef ap_uint<NFINE>  fine_adr_t;    // covers 4 quadrant
 
 // rounding makes huge difference in the noise floor
 typedef ap_fixed<18,1,AP_RND_CONV,AP_SAT_SYM> lut_word_t;
 typedef ap_fixed<18,-7> fine_word_t;
 
-const double DELTA = M_PI/(2*LUTSIZE*FINESIZE); // fine lut resolution, range covers 0 to pi/(2*LUTSIZE)
 
-void phase_to_sincos_wLUT(acc_t acc, ddsiq32_t &out);
+typedef struct {
+	lut_word_t cos_word;
+	lut_word_t sin_word;
+	fine_word_t fine_word;
+} dds_words_t;
 
-
+void phase_sincos_LUT(acc_t acc, dds_words_t &out);
+void phase_sincos_LUT_wstatic(acc_t acc, dds_words_t &out);
+void phase_sincos_LUT_alwaysquery(acc_t acc, dds_words_t &out);
 #endif
 
 /************************************************

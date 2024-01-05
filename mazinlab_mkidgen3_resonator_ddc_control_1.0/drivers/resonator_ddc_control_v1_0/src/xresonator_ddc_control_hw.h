@@ -1,0 +1,47 @@
+// ==============================================================
+// Vitis HLS - High-Level Synthesis from C, C++ and OpenCL v2022.1 (64-bit)
+// Tool Version Limit: 2022.04
+// Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+// ==============================================================
+// control
+// 0x0000 : reserved
+// 0x0004 : reserved
+// 0x0008 : reserved
+// 0x000c : reserved
+// 0x0010 : Data signal of clear_accumulator
+//          bit 0  - clear_accumulator[0] (Read/Write)
+//          others - reserved
+// 0x0014 : reserved
+// 0x2000 ~
+// 0x3fff : Memory 'tones' (256 * 256b)
+//          Word 8n   : bit [31:0] - tones[n][31: 0]
+//          Word 8n+1 : bit [31:0] - tones[n][63:32]
+//          Word 8n+2 : bit [31:0] - tones[n][95:64]
+//          Word 8n+3 : bit [31:0] - tones[n][127:96]
+//          Word 8n+4 : bit [31:0] - tones[n][159:128]
+//          Word 8n+5 : bit [31:0] - tones[n][191:160]
+//          Word 8n+6 : bit [31:0] - tones[n][223:192]
+//          Word 8n+7 : bit [31:0] - tones[n][255:224]
+// 0x4000 ~
+// 0x5fff : Memory 'centers' (256 * 256b)
+//          Word 8n   : bit [31:0] - centers[n][31: 0]
+//          Word 8n+1 : bit [31:0] - centers[n][63:32]
+//          Word 8n+2 : bit [31:0] - centers[n][95:64]
+//          Word 8n+3 : bit [31:0] - centers[n][127:96]
+//          Word 8n+4 : bit [31:0] - centers[n][159:128]
+//          Word 8n+5 : bit [31:0] - centers[n][191:160]
+//          Word 8n+6 : bit [31:0] - centers[n][223:192]
+//          Word 8n+7 : bit [31:0] - centers[n][255:224]
+// (SC = Self Clear, COR = Clear on Read, TOW = Toggle on Write, COH = Clear on Handshake)
+
+#define XRESONATOR_DDC_CONTROL_CONTROL_ADDR_CLEAR_ACCUMULATOR_DATA 0x0010
+#define XRESONATOR_DDC_CONTROL_CONTROL_BITS_CLEAR_ACCUMULATOR_DATA 1
+#define XRESONATOR_DDC_CONTROL_CONTROL_ADDR_TONES_BASE             0x2000
+#define XRESONATOR_DDC_CONTROL_CONTROL_ADDR_TONES_HIGH             0x3fff
+#define XRESONATOR_DDC_CONTROL_CONTROL_WIDTH_TONES                 256
+#define XRESONATOR_DDC_CONTROL_CONTROL_DEPTH_TONES                 256
+#define XRESONATOR_DDC_CONTROL_CONTROL_ADDR_CENTERS_BASE           0x4000
+#define XRESONATOR_DDC_CONTROL_CONTROL_ADDR_CENTERS_HIGH           0x5fff
+#define XRESONATOR_DDC_CONTROL_CONTROL_WIDTH_CENTERS               256
+#define XRESONATOR_DDC_CONTROL_CONTROL_DEPTH_CENTERS               256
+
